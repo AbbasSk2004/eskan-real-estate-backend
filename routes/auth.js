@@ -106,7 +106,8 @@ router.post('/register', async (req, res) => {
           firstname,
           lastname,
           phone
-        }
+        },
+        emailRedirectTo: process.env.EMAIL_REDIRECT_TO || 'realestate://verification-success'
       }
     });
 
