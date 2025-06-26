@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: eskan-real-estate-api
+    env: node
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+    healthCheckPath: /api/health
+    autoDeploy: true 
