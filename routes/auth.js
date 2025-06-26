@@ -628,4 +628,59 @@ router.get('/check', async (req, res) => {
   }
 });
 
+// Verify email with Supabase token directly
+router.post('/verify-supabase', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification token is required'
+      });
+    }
+
+    // Use Supabase admin API to verify the token
+    const { data, error } = await supabase.auth.admin.verifyEmail(token);
+
+    if (error) {
+      logger.error('Email verification error:', error);
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Failed to verify email'
+      });
+    }
+
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('profiles_id', data.user.id)
+      .single();
+
+    if (profileError) {
+      logger.error('Profile fetch error after verification:', profileError);
+      // Continue with verification success even if profile fetch fails
+    } else if (profile) {
+      // Update profile to mark as verified
+      await supabase
+        .from('profiles')
+        .update({ email_verified: true })
+        .eq('profiles_id', data.user.id);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Email verified successfully',
+      user: data.user
+    });
+  } catch (err) {
+    logger.error('Supabase verification error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify email'
+    });
+  }
+});
+
 module.exports = router; 
