@@ -2,12 +2,31 @@ services:
   - type: web
     name: eskan-real-estate-api
     env: node
-    buildCommand: npm install
+    buildCommand: | 
+      npm install
+      cp .env.production .env
     startCommand: node index.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3001
+      # These will override any values from .env.production for extra security
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: REFRESH_TOKEN_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
     healthCheckPath: /api/health
     autoDeploy: true 

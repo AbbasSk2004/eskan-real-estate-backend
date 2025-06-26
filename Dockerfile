@@ -1,33 +1,49 @@
 # Backend Dockerfile
-FROM node:18-alpine
+FROM node:22.15.0-alpine3.19
 
 # Create app directory
 WORKDIR /app
 
-# Install app dependencies
+# Set default environment variables
+ENV NODE_ENV=production \
+    PORT=3001
+
+# Feature Flags
+ENV ENABLE_ANALYTICS=true \
+    ENABLE_MAP_SEARCH=true \
+    ENABLE_SOCIAL_SHARING=true \
+    ENABLE_LAZY_LOADING=true \
+    ENABLE_IMAGE_OPTIMIZATION=true \
+    ENABLE_SEARCH_SUGGESTIONS=true \
+    ENABLE_SAVED_SEARCHES=true \
+    DEBUG_AUTH=false
+
+# File Upload Configuration
+ENV MAX_FILE_SIZE=1048760 \
+    MAX_FILES_COUNT=10
+
+# JWT Token Expiration (non-sensitive defaults)
+ENV JWT_EXPIRES_IN=7d \
+    REFRESH_TOKEN_EXPIRES_IN=30d
+
+# Copy package files first for better caching
 COPY package*.json ./
 RUN npm ci --only=production
+
+# Copy production env file and rename it
+COPY .env.production ./.env
 
 # Copy app source
 COPY . .
 
-# Create uploads directory
-RUN mkdir -p uploads
+# Create uploads directory and ensure proper permissions
+RUN mkdir -p uploads && chown -R node:node /app
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
+# Use node user for security
+USER node
 
-# Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
-USER nodejs
-
-# Expose port
-EXPOSE 5000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node healthcheck.js
+# Expose port (Render will use PORT env variable)
+EXPOSE ${PORT}
 
 # Start the application
 CMD ["node", "index.js"]
