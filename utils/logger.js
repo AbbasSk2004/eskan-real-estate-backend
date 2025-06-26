@@ -25,8 +25,8 @@ const logger = winston.createLogger({
   ]
 });
 
-// Add console logging in development
-if (process.env.NODE_ENV !== 'production') {
+// Add console logging in all environments so that container logs are visible
+if (process.env.RENDER || process.env.NODE_ENV !== 'test') {
   logger.add(new winston.transports.Console({
     format: winston.format.combine(
       winston.format.colorize(),
