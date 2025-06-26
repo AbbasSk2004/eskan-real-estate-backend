@@ -5,6 +5,8 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const multer = require('multer');
 const logger = require('./utils/logger');
+const setupGlobalErrorHandlers = require('./utils/errorHandlers');
+setupGlobalErrorHandlers();
 const { uploadToSupabaseStorage } = require('./utils/storage');
 const morgan = require('morgan');
 const helmet = require('helmet');
