@@ -107,7 +107,8 @@ router.post('/register', async (req, res) => {
           lastname,
           phone
         },
-        emailRedirectTo: process.env.EMAIL_REDIRECT_TO || 'realestate://verification-success'
+        // OTP verification will be handled by the email template
+        // which should include {{ .Token }} instead of {{ .ConfirmationURL }}
       }
     });
 
@@ -150,7 +151,8 @@ router.post('/register', async (req, res) => {
         ...authData.user,
         profile
       },
-      session: authData.session
+      session: authData.session,
+      message: 'Registration successful. Please check your email for the verification code.'
     });
   } catch (err) {
     logger.error('Registration error:', err);
@@ -680,6 +682,66 @@ router.post('/verify-supabase', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to verify email'
+    });
+  }
+});
+
+// Verify OTP endpoint
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { email, token } = req.body;
+
+    if (!email || !token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and verification code are required'
+      });
+    }
+
+    // Verify OTP with Supabase
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email'
+    });
+
+    if (error) {
+      logger.error('OTP verification error:', error);
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Failed to verify email code'
+      });
+    }
+
+    // Get user profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('profiles_id', data.user.id)
+      .single();
+
+    if (profileError) {
+      logger.error('Profile fetch error after OTP verification:', profileError);
+      // Continue with verification success even if profile fetch fails
+    } else if (profile) {
+      // Update profile to mark as verified
+      await supabase
+        .from('profiles')
+        .update({ email_verified: true })
+        .eq('profiles_id', data.user.id);
+    }
+
+    return res.json({
+      success: true,
+      message: 'Email verified successfully',
+      user: data.user,
+      session: data.session
+    });
+  } catch (err) {
+    logger.error('OTP verification error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify email code'
     });
   }
 });
