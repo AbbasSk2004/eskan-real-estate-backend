@@ -5,21 +5,20 @@ const axios = require('axios');
 // Environment variables - check both backend and frontend keys
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
-// Debug logging for API key
-console.log('Maps Route: Environment Check', {
-  NODE_ENV: process.env.NODE_ENV,
-  hasBackendKey: !!process.env.GOOGLE_MAPS_API_KEY,
-  hasFrontendKey: !!process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
-  finalKeyLength: GOOGLE_MAPS_API_KEY?.length,
-  keyStartsWith: GOOGLE_MAPS_API_KEY?.substring(0, 8)
-});
+// Log API key info only once during module initialization
+if (process.env.NODE_ENV === 'production') {
+  console.log('Maps Route: Environment Check', {
+    NODE_ENV: process.env.NODE_ENV,
+    hasBackendKey: !!process.env.GOOGLE_MAPS_API_KEY,
+    hasFrontendKey: !!process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+    finalKeyLength: GOOGLE_MAPS_API_KEY?.length,
+    keyStartsWith: GOOGLE_MAPS_API_KEY?.substring(0, 8)
+  });
+}
 
 // Simple API key format validation
 const validateApiKey = (req, res, next) => {
-  console.log('Maps Route: Validating API key...');
-  
   if (!GOOGLE_MAPS_API_KEY) {
-    console.error('Maps Route: Google Maps API key is missing');
     return res.status(500).json({
       success: false,
       error: 'Google Maps API key is not configured',
@@ -28,7 +27,6 @@ const validateApiKey = (req, res, next) => {
   }
 
   if (!GOOGLE_MAPS_API_KEY.startsWith('AIza')) {
-    console.error('Maps Route: Invalid API key format');
     return res.status(500).json({
       success: false,
       error: 'Invalid Google Maps API key format',
@@ -36,7 +34,6 @@ const validateApiKey = (req, res, next) => {
     });
   }
 
-  console.log('Maps Route: API key validation successful');
   next();
 };
 
