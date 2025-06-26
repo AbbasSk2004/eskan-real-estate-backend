@@ -2,21 +2,17 @@ services:
   - type: web
     name: eskan-real-estate-api
     env: node
-    buildCommand: | 
-      npm install
-      cp .env.production .env
+    buildCommand: npm install
     startCommand: node index.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3001
-      # These will override any values from .env.production for extra security
+      # Sensitive values - set these in Render dashboard
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: GOOGLE_MAPS_API_KEY
         sync: false
@@ -28,5 +24,10 @@ services:
         sync: false
       - key: SESSION_SECRET
         sync: false
+      # Public URLs
+      - key: API_BASE_URL
+        value: https://eskan-real-estate-backend.onrender.com/api
+      - key: WS_URL
+        value: wss://eskan-real-estate-backend.onrender.com
     healthCheckPath: /api/health
     autoDeploy: true 

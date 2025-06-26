@@ -30,9 +30,6 @@ ENV JWT_EXPIRES_IN=7d \
 COPY package*.json ./
 RUN npm ci --only=production
 
-# Copy production env file and rename it
-COPY .env.production ./.env
-
 # Copy app source
 COPY . .
 
