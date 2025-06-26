@@ -9,24 +9,29 @@ services:
         value: production
       - key: PORT
         value: 3001
-      # Sensitive values - set these in Render dashboard
+      # Supabase Configuration
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      # Frontend Configuration (Web + Mobile)
+      - key: FRONTEND_URL
+        value: '["https://eskan-real-estate.vercel.app", "exp://192.168.1.7:8081", "exp://localhost:8081"]'
+      # Google Services
       - key: GOOGLE_MAPS_API_KEY
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
+      # Security Configuration
       - key: JWT_SECRET
         sync: false
       - key: REFRESH_TOKEN_SECRET
         sync: false
       - key: SESSION_SECRET
         sync: false
-      # Public URLs
+      # API Configuration
       - key: API_BASE_URL
         value: https://eskan-real-estate-backend.onrender.com/api
       - key: WS_URL

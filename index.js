@@ -87,12 +87,14 @@ const corsOptions = {
     ? [
         'https://eskan-real-estate.vercel.app', // Vercel's default domain
         /\.vercel\.app$/, // Any Vercel preview deployments
-        process.env.FRONTEND_URL, // Your custom domain if you add one later
+        'https://eskan-real-estate-react.vercel.app', // React website
+        'http://localhost:3000', // Development website
+        ...allowedOrigins // Mobile app URLs from FRONTEND_URL
       ]
-    : 'http://localhost:3000', // Development
+    : ['http://localhost:3000', 'exp://localhost:8081', 'http://localhost:8081'], // Development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Refresh-Token']
 };
 
 app.use(cors(corsOptions));
