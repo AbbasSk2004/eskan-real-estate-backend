@@ -55,6 +55,9 @@ const session = require('express-session');
 // Initialize Express app
 const app = express();
 
+// NEW: Tell Express we are behind a proxy (needed for correct IP detection & rate-limit)
+app.set('trust proxy', true);
+
 // Security middleware with correct configuration for frontend
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -323,7 +326,11 @@ if (process.env.NODE_ENV === 'production') {
   const rateLimit = require('express-rate-limit');
   app.use(rateLimit({
     windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes
-    max: process.env.RATE_LIMIT_MAX_REQUESTS || 100
+    max: process.env.RATE_LIMIT_MAX_REQUESTS || 100,
+    // Disable built-in validation that throws when trust proxy is false (we set it true above)
+    validate: {
+      xForwardedForHeader: false
+    }
   }));
 }
 
