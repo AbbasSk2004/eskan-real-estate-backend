@@ -88,7 +88,6 @@ const verifySession = async (req) => {
 // Get all agents
 router.get('/', async (req, res) => {
   try {
-    console.log('Fetching all agents...');
     const { data, error } = await supabase
       .from('agents')
       .select(`
@@ -113,8 +112,6 @@ router.get('/', async (req, res) => {
         error: error.message
       });
     }
-
-    console.log('Fetched agents:', data);
 
     // Transform data to match frontend expectations
     const transformedAgents = (data || []).map(agent => ({
@@ -144,8 +141,6 @@ router.get('/', async (req, res) => {
       }
     }));
 
-    console.log('Transformed agents:', transformedAgents);
-
     res.json({
       success: true,
       message: 'Agents fetched successfully',
@@ -164,7 +159,6 @@ router.get('/', async (req, res) => {
 // Get featured agents
 router.get('/featured', async (req, res) => {
   try {
-    console.log('Fetching featured agents...');
     const { data, error } = await supabase
       .from('agents')
       .select(`
@@ -192,8 +186,6 @@ router.get('/featured', async (req, res) => {
       });
     }
 
-    console.log('Fetched featured agents:', data);
-
     // Transform data to match frontend expectations
     const transformedAgents = (data || []).map(agent => ({
       id: agent.id,
@@ -221,8 +213,6 @@ router.get('/featured', async (req, res) => {
         phone: agent.profiles?.phone
       }
     }));
-
-    console.log('Transformed featured agents:', transformedAgents);
 
     res.json({
       success: true,
@@ -442,8 +432,6 @@ router.post('/applications', upload.fields([
           PROPERTY_IMAGES_BUCKET,
           resumeFileName
         );
-        // The function now returns just the URL string, not an object
-        console.log('Resume uploaded successfully:', resumeUrl);
       } catch (error) {
         logger.error('Resume upload error:', error);
         return res.status(500).json({
@@ -466,8 +454,6 @@ router.post('/applications', upload.fields([
           PROPERTY_IMAGES_BUCKET,
           photoFileName
         );
-        // The function now returns just the URL string, not an object
-        console.log('Profile photo uploaded successfully:', profilePhotoUrl);
       } catch (error) {
         logger.error('Profile photo upload error:', error);
         return res.status(500).json({
@@ -478,7 +464,7 @@ router.post('/applications', upload.fields([
       }
 
       // Log the data we're about to insert
-      console.log('Attempting to insert agent with data:', {
+      logger.info('Attempting to insert agent with data:', {
         profiles_id: user.id,
         specialty: specialization,
         experience,
@@ -521,8 +507,6 @@ router.post('/applications', upload.fields([
           error: error.message
         });
       }
-
-      console.log('Agent application created successfully:', data);
 
       res.status(201).json({
         success: true,
