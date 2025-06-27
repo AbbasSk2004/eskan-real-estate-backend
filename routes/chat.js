@@ -232,6 +232,20 @@ router.post('/conversations', async (req, res) => {
     }
 
     res.status(201).json({ success: true, data: newConversation });
+
+    // Notify participants via WebSocket (non-blocking)
+    try {
+      const { sendToUser } = require('../websocket');
+      // Send to recipient if not sender
+      if (newConversation.participant1_id !== profiles_id) {
+        sendToUser(newConversation.participant1_id, 'new_conversation', newConversation);
+      }
+      if (newConversation.participant2_id !== profiles_id) {
+        sendToUser(newConversation.participant2_id, 'new_conversation', newConversation);
+      }
+    } catch (wsErr) {
+      logger.warn('WebSocket notify failed:', wsErr.message);
+    }
   } catch (err) {
     logger.error('Error in POST /conversations:', err);
     res.status(500).json({
@@ -287,6 +301,20 @@ router.post('/messages', async (req, res) => {
       .eq('id', conversationId);
 
     res.status(201).json({ success: true, data });
+
+    // Notify participants via WebSocket (non-blocking)
+    try {
+      const { sendToUser } = require('../websocket');
+      // Send to recipient if not sender
+      if (conversation.participant1_id !== profiles_id) {
+        sendToUser(conversation.participant1_id, 'new_message', data);
+      }
+      if (conversation.participant2_id !== profiles_id) {
+        sendToUser(conversation.participant2_id, 'new_message', data);
+      }
+    } catch (wsErr) {
+      logger.warn('WebSocket notify failed:', wsErr.message);
+    }
   } catch (err) {
     logger.error('Error in POST /messages:', err);
     res.status(500).json({ success: false, error: err.message });

@@ -1249,6 +1249,14 @@ async function startServer() {
       logger.info('✅ SUPABASE_ANON_KEY is set');
       logger.info('✅ FRONTEND_URL is set');
       logger.info(`✅ Server started successfully on http://localhost:${PORT}/api`);
+
+      // Initialise WebSocket server once the HTTP server is ready
+      try {
+        const { setupWebSocket } = require('./websocket');
+        setupWebSocket(server);
+      } catch (wsErr) {
+        logger.error('Failed to initialise WebSocket server:', wsErr);
+      }
     });
   } catch (err) {
     logger.error('Failed to start server:', err);
