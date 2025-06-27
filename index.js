@@ -55,7 +55,7 @@ const session = require('express-session');
 // Initialize Express app
 const app = express();
 
-// NEW: Tell Express we are behind a proxy (needed for correct IP detection & rate-limit)
+// Tell Express it is behind a proxy so req.ip works when X-Forwarded-For is set (Render, Heroku, etc.)
 app.set('trust proxy', true);
 
 // Security middleware with correct configuration for frontend
@@ -321,16 +321,13 @@ app.use('/api/maps', mapsRouter);
 app.use('/api/faqs', faqRoutes);
 app.use('/api/blogs', blogRoutes);
 
-// Rate limiting
+// Rate limiting (production only)
 if (process.env.NODE_ENV === 'production') {
   const rateLimit = require('express-rate-limit');
   app.use(rateLimit({
-    windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes
+    windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000,
     max: process.env.RATE_LIMIT_MAX_REQUESTS || 100,
-    // Disable built-in validation that throws when trust proxy is false (we set it true above)
-    validate: {
-      xForwardedForHeader: false
-    }
+    validate: { xForwardedForHeader: false }
   }));
 }
 
