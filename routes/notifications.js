@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
     }
 
     const profiles_id = req.user.id;
-    logger.info(`Fetching notifications for user ${profiles_id}`);
+    logger.debug(`Fetching notifications for user ${profiles_id}`);
 
     const { data, error } = await supabase
       .from('notifications')
@@ -37,7 +37,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    logger.info(`Found ${data?.length || 0} notifications for user ${profiles_id}`);
+    logger.debug(`Found ${data?.length || 0} notifications for user ${profiles_id}`);
 
     res.json({
       success: true,
