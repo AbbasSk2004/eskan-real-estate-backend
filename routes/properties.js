@@ -101,6 +101,7 @@ router.get('/featured', async (req, res) => {
         shop_front_width,
         storage_area,
         units,
+        elevators,
         plot_size,
         land_type,
         ceiling_height,
@@ -116,8 +117,7 @@ router.get('/featured', async (req, res) => {
       `)
       .eq('is_featured', true)
       .eq('verified', true)
-      .order('created_at', { ascending: false })
-      .limit(12);
+      .order('created_at', { ascending: false });
 
     if (error) {
       logger.error('Error fetching featured properties:', error);
@@ -181,6 +181,7 @@ router.get('/recommended', async (req, res) => {
         shop_front_width,
         storage_area,
         units,
+        elevators,
         plot_size,
         land_type,
         ceiling_height,
@@ -260,6 +261,7 @@ router.get('/user/properties', async (req, res) => {
         area,
         floor,
         units,
+        elevators,
         plot_size,
         land_type,
         ceiling_height,
@@ -351,6 +353,7 @@ router.get('/', async (req, res) => {
         area,
         floor,
         units,
+        elevators,
         plot_size,
         land_type,
         ceiling_height,
