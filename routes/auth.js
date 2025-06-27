@@ -746,4 +746,113 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
+// Forgot password endpoint
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    // Check if user exists
+    const { data: user, error: userError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (userError && userError.code !== 'PGRST116') {
+      logger.error('User lookup error:', userError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process request'
+      });
+    }
+
+    // Even if user doesn't exist, don't reveal this for security reasons
+    // Just proceed as if everything is fine
+    
+    // Request password reset from Supabase
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      type: 'recovery'
+    });
+
+    if (error) {
+      logger.error('Password reset request error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset email'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset instructions sent to your email'
+    });
+  } catch (err) {
+    logger.error('Forgot password error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process password reset request'
+    });
+  }
+});
+
+// Reset password endpoint
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, verification code, and new password are required'
+      });
+    }
+
+    // Verify OTP first
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token: otp,
+      type: 'recovery'
+    });
+
+    if (verifyError) {
+      logger.error('OTP verification error during password reset:', verifyError);
+      return res.status(400).json({
+        success: false,
+        message: verifyError.message || 'Invalid or expired verification code'
+      });
+    }
+
+    // If OTP is valid, update the password
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (updateError) {
+      logger.error('Password update error:', updateError);
+      return res.status(400).json({
+        success: false,
+        message: updateError.message || 'Failed to update password'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Password has been reset successfully'
+    });
+  } catch (err) {
+    logger.error('Password reset error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password'
+    });
+  }
+});
+
 module.exports = router; 
