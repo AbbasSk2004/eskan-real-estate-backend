@@ -114,7 +114,7 @@ function extractCoordinatesFromIframe(url) {
 
 // Helper function to extract coordinates from a URL
 async function extractCoordinatesFromUrl(url) {
-  console.log('Attempting to extract coordinates from:', url);
+  // console.log('Attempting to extract coordinates from:', url);
 
   // Pattern 1: @lat,lng format
   let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
@@ -123,7 +123,7 @@ async function extractCoordinatesFromUrl(url) {
       lat: parseFloat(match[1]),
       lng: parseFloat(match[2])
     };
-    console.log('Found coordinates using @lat,lng pattern:', coords);
+    // console.log('Found coordinates using @lat,lng pattern:', coords);
     return coords;
   }
 
@@ -134,7 +134,7 @@ async function extractCoordinatesFromUrl(url) {
       lat: parseFloat(match[1]),
       lng: parseFloat(match[2])
     };
-    console.log('Found coordinates using ll=lat,lng pattern:', coords);
+    // console.log('Found coordinates using ll=lat,lng pattern:', coords);
     return coords;
   }
 
@@ -145,7 +145,7 @@ async function extractCoordinatesFromUrl(url) {
       lat: parseFloat(match[1]),
       lng: parseFloat(match[2])
     };
-    console.log('Found coordinates using q=lat,lng pattern:', coords);
+    // console.log('Found coordinates using q=lat,lng pattern:', coords);
     return coords;
   }
 
@@ -156,18 +156,18 @@ async function extractCoordinatesFromUrl(url) {
       lat: parseFloat(match[2]),
       lng: parseFloat(match[1])
     };
-    console.log('Found coordinates using data= pattern:', coords);
+    // console.log('Found coordinates using data= pattern:', coords);
     return coords;
   }
 
   // Pattern 5: Extract from place name in URL
   if (url.includes('/place/')) {
     try {
-      console.log('Attempting to geocode place name from URL');
+      // console.log('Attempting to geocode place name from URL');
       const placeName = url.split('/place/')[1].split('/')[0];
       if (placeName) {
         const decodedPlaceName = decodeURIComponent(placeName).replace(/\+/g, ' ');
-        console.log('Geocoding place name:', decodedPlaceName);
+        // console.log('Geocoding place name:', decodedPlaceName);
         
         const geocodeResponse = await fetchWithRetry(
           `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(decodedPlaceName)}&key=${GOOGLE_MAPS_API_KEY}`
@@ -175,7 +175,7 @@ async function extractCoordinatesFromUrl(url) {
         
         if (geocodeResponse.data?.results?.[0]?.geometry?.location) {
           const coords = geocodeResponse.data.results[0].geometry.location;
-          console.log('Found coordinates through geocoding:', coords);
+          // console.log('Found coordinates through geocoding:', coords);
           return coords;
         }
       }
@@ -198,13 +198,13 @@ router.get('/extract-coordinates', async (req, res) => {
       });
     }
 
-    console.log('Processing URL:', url);
+    // console.log('Processing URL:', url);
 
     // First try to extract from iframe if it's an embed code
     if (url.includes('<iframe')) {
       const iframeCoords = extractCoordinatesFromIframe(url);
       if (iframeCoords) {
-        console.log('Successfully extracted coordinates from iframe:', iframeCoords);
+        // console.log('Successfully extracted coordinates from iframe:', iframeCoords);
         return res.json({
           success: true,
           data: iframeCoords
@@ -216,7 +216,7 @@ router.get('/extract-coordinates', async (req, res) => {
     let coords = await extractCoordinatesFromUrl(url);
     
     if (coords) {
-      console.log('Successfully extracted coordinates:', coords);
+      // console.log('Successfully extracted coordinates:', coords);
       return res.json({
         success: true,
         data: coords
@@ -231,7 +231,7 @@ router.get('/extract-coordinates', async (req, res) => {
 
       if (placeResponse.data?.candidates?.[0]?.geometry?.location) {
         coords = placeResponse.data.candidates[0].geometry.location;
-        console.log('Found coordinates using Places API:', coords);
+        // console.log('Found coordinates using Places API:', coords);
         return res.json({
           success: true,
           data: coords
@@ -267,17 +267,17 @@ router.get('/geocode', validateApiKey, async (req, res) => {
       });
     }
 
-    console.log('Attempting to geocode address:', address);
+    // console.log('Attempting to geocode address:', address);
 
     const response = await fetchWithRetry(
       `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`
     );
 
-    console.log('Geocoding response status:', response.data.status);
+    // console.log('Geocoding response status:', response.data.status);
     
     if (response.data.status === 'OK') {
       const location = response.data.results[0].geometry.location;
-      console.log('Successfully geocoded address:', location);
+      // console.log('Successfully geocoded address:', location);
       res.json({
         success: true,
         data: location

@@ -703,16 +703,6 @@ router.post('/', async (req, res) => {
           created_at: new Date().toISOString()
         };
 
-        // Log property data for debugging
-        console.log('Property data being saved:', {
-          ...propertyData,
-          property_type: propertyData.property_type,
-          water_source: propertyData.water_source,
-          crop_types: propertyData.crop_types,
-          features: typeof propertyData.features === 'object' ? 
-            JSON.stringify(propertyData.features) : propertyData.features
-        });
-
         // Insert property into database
         const { data, error } = await supabase
           .from('properties')
