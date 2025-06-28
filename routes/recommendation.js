@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../utils/supabaseClient');
+const { getUserRecommendations, getSimilarProperties } = require('../utils/pythonRecommendationEngine');
+const logger = require('../utils/logger');
 
-// Helper function to calculate similarity between properties
+// Helper function to calculate similarity between properties (fallback if Python fails)
 const calculatePropertySimilarity = (property1, property2) => {
   let score = 0;
   
@@ -35,17 +37,29 @@ router.get('/recommended', async (req, res) => {
     const limit = parseInt(req.query.limit) || 5;
 
     if (user_id) {
-      // Get user's recent views
+      logger.info(`Getting recommendations for user: ${user_id}`);
+      
+      // Get user's recent views from real database
       const { data: viewsData, error: viewsError } = await supabase
         .from('property_views')
-        .select('*, property:properties(*)')
+        .select(`
+          id,
+          property_id,
+          profiles_id,
+          viewed_at,
+          ip_address
+        `)
         .eq('profiles_id', user_id)
         .order('viewed_at', { ascending: false })
         .limit(10);
 
-      if (viewsError) throw viewsError;
+      if (viewsError) {
+        logger.error('Error fetching user views:', viewsError);
+        throw viewsError;
+      }
 
-      if (!viewsData.length) {
+      if (!viewsData || viewsData.length === 0) {
+        logger.info('No viewing history found, returning recommended properties');
         // Fallback to recommended and verified properties if no viewing history
         const { data: recommended, error: recommendedError } = await supabase
           .from('properties')
@@ -63,6 +77,8 @@ router.get('/recommended', async (req, res) => {
             governate,
             main_image,
             created_at,
+            is_featured,
+            recommended,
             profiles:profiles!properties_profiles_id_fkey (
               firstname,
               lastname,
@@ -74,11 +90,15 @@ router.get('/recommended', async (req, res) => {
           .order('created_at', { ascending: false })
           .limit(limit);
 
-        if (recommendedError) throw recommendedError;
+        if (recommendedError) {
+          logger.error('Error fetching recommended properties:', recommendedError);
+          throw recommendedError;
+        }
+        
         return res.json({ success: true, data: recommended });
       }
 
-      // Get all available properties
+      // Get all available properties from real database
       const { data: allProperties, error: propertiesError } = await supabase
         .from('properties')
         .select(`
@@ -95,6 +115,9 @@ router.get('/recommended', async (req, res) => {
           governate,
           main_image,
           created_at,
+          is_featured,
+          recommended,
+          features,
           profiles:profiles!properties_profiles_id_fkey (
             firstname,
             lastname,
@@ -103,27 +126,76 @@ router.get('/recommended', async (req, res) => {
         `)
         .eq('verified', true);
 
-      if (propertiesError) throw propertiesError;
+      if (propertiesError) {
+        logger.error('Error fetching all properties:', propertiesError);
+        throw propertiesError;
+      }
 
-      // Calculate recommendations based on viewing history
+      // For each viewed property, get the full property data
+      const viewedProperties = [];
+      for (const view of viewsData) {
+        const property = allProperties.find(p => p.id === view.property_id);
+        if (property) {
+          viewedProperties.push({
+            property_id: view.property_id,
+            property
+          });
+        }
+      }
+
+      try {
+        logger.info('Using scikit-learn for recommendations');
+        // Try using scikit-learn recommendation engine with real data
+        const recommendedIds = await getUserRecommendations(viewedProperties, allProperties, limit);
+        
+        if (recommendedIds && recommendedIds.length > 0) {
+          // Filter properties to get only the recommended ones
+          const recommendedProperties = allProperties.filter(prop => 
+            recommendedIds.includes(prop.id)
+          );
+          
+          // Sort them in the same order as the IDs
+          const sortedRecommendations = recommendedIds.map(id => 
+            recommendedProperties.find(prop => prop.id === id)
+          ).filter(Boolean);
+          
+          logger.info(`Found ${sortedRecommendations.length} recommendations using scikit-learn`);
+          return res.json({ 
+            success: true, 
+            data: sortedRecommendations,
+            source: 'ml'
+          });
+        }
+      } catch (pythonError) {
+        logger.error('Python recommendation engine failed:', pythonError);
+        // Fall back to JavaScript implementation if Python fails
+      }
+
+      // Fallback: Calculate recommendations using JavaScript
+      logger.info('Using JavaScript fallback for recommendations');
       const recommendations = allProperties
         .filter(prop => !viewsData.find(view => view.property_id === prop.id))
         .map(property => {
-          const totalScore = viewsData.reduce((score, view) => {
+          const totalScore = viewedProperties.reduce((score, view) => {
             return score + calculatePropertySimilarity(view.property, property);
           }, 0);
           
           return {
             property,
-            score: totalScore / viewsData.length
+            score: totalScore / viewedProperties.length
           };
         })
         .sort((a, b) => b.score - a.score)
         .slice(0, limit)
         .map(item => item.property);
 
-      res.json({ success: true, data: recommendations });
+      res.json({ 
+        success: true, 
+        data: recommendations,
+        source: 'js'
+      });
     } else {
+      logger.info('No user ID provided, returning recommended properties');
       // Return recommended and verified properties for non-authenticated users
       const { data: recommended, error: recommendedError } = await supabase
         .from('properties')
@@ -141,6 +213,8 @@ router.get('/recommended', async (req, res) => {
           governate,
           main_image,
           created_at,
+          is_featured,
+          recommended,
           profiles:profiles!properties_profiles_id_fkey (
             firstname,
             lastname,
@@ -152,11 +226,19 @@ router.get('/recommended', async (req, res) => {
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      if (recommendedError) throw recommendedError;
-      res.json({ success: true, data: recommended });
+      if (recommendedError) {
+        logger.error('Error fetching recommended properties:', recommendedError);
+        throw recommendedError;
+      }
+      
+      res.json({ 
+        success: true, 
+        data: recommended,
+        source: 'default'
+      });
     }
   } catch (error) {
-    console.error('Error in /recommended:', error);
+    logger.error('Error in /recommended:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to get recommendations'
@@ -164,4 +246,4 @@ router.get('/recommended', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

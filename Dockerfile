@@ -1,12 +1,20 @@
 # Backend Dockerfile
 FROM node:18.19-alpine3.19
 
+# Install Python and pip
+RUN apk add --no-cache python3 py3-pip git \
+    && python3 -m pip install --no-cache-dir --upgrade pip
+
+# Configure Git to handle line endings
+RUN git config --global core.autocrlf false
+
 # Create app directory
 WORKDIR /app
 
 # Set default environment variables
 ENV NODE_ENV=production \
-    PORT=3001
+    PORT=3001 \
+    PYTHON_VERSION=3.8.12
 
 # Feature Flags
 ENV ENABLE_ANALYTICS=true \
@@ -16,6 +24,7 @@ ENV ENABLE_ANALYTICS=true \
     ENABLE_IMAGE_OPTIMIZATION=true \
     ENABLE_SEARCH_SUGGESTIONS=true \
     ENABLE_SAVED_SEARCHES=true \
+    ENABLE_ML_RECOMMENDATIONS=true \
     DEBUG_AUTH=false
 
 # File Upload Configuration
@@ -26,9 +35,12 @@ ENV MAX_FILE_SIZE=1048760 \
 ENV JWT_EXPIRES_IN=7d \
     REFRESH_TOKEN_EXPIRES_IN=30d
 
-# Copy package files first for better caching
-COPY package*.json ./
-RUN npm install --omit=dev
+# Copy package files and Python requirements first
+COPY package*.json requirements.txt ./
+
+# Install dependencies
+RUN npm install --omit=dev && \
+    python3 -m pip install --no-cache-dir -r requirements.txt
 
 # Copy app source
 COPY . .

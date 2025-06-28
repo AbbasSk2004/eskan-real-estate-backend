@@ -2,13 +2,22 @@ services:
   - type: web
     name: eskan-real-estate-api
     env: node
-    buildCommand: npm install
+    buildCommand: |
+      npm install
+      python3 -m pip install -r requirements.txt
     startCommand: node index.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3001
+      # ML Configuration
+      - key: ENABLE_ML_RECOMMENDATIONS
+        value: true
+      - key: ML_MODEL_PATH
+        value: ./ml/models
+      - key: ML_CACHE_TTL
+        value: 3600
       # Supabase Configuration
       - key: SUPABASE_URL
         sync: false
@@ -37,4 +46,4 @@ services:
       - key: WS_URL
         value: wss://eskan-real-estate-backend.onrender.com
     healthCheckPath: /api/health
-    autoDeploy: true 
+    autoDeploy: true
