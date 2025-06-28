@@ -2,9 +2,11 @@ services:
   - type: web
     name: eskan-real-estate-api
     env: node
+    rootDirectory: .
     buildCommand: |
       npm install
       python3 -m pip install -r requirements.txt
+      node scripts/build.js
     startCommand: node index.js
     envVars:
       - key: NODE_ENV
