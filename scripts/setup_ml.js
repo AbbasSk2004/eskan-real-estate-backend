@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Path to requirements.txt
-const requirementsPath = path.join(__dirname, 'requirements.txt');
+const requirementsPath = path.join(__dirname, '..', 'requirements.txt');
 
 // Check if requirements.txt exists
 if (!fs.existsSync(requirementsPath)) {
@@ -14,7 +14,8 @@ if (!fs.existsSync(requirementsPath)) {
 console.log('Installing Python dependencies...');
 
 // Check if Python is installed
-const pythonProcess = spawn('python', ['--version']);
+const pythonExec = process.platform === 'win32' ? 'python' : 'python3';
+const pythonProcess = spawn(pythonExec, ['--version']);
 
 pythonProcess.on('error', (err) => {
   console.error('Error: Python is not installed or not in PATH');
@@ -29,7 +30,7 @@ pythonProcess.on('close', (code) => {
   }
 
   // Install dependencies using pip
-  const pipProcess = spawn('pip', ['install', '-r', requirementsPath]);
+  const pipProcess = spawn(pythonExec, ['-m', 'pip', 'install', '-r', requirementsPath]);
 
   pipProcess.stdout.on('data', (data) => {
     console.log(data.toString());
@@ -56,7 +57,7 @@ pythonProcess.on('close', (code) => {
     // Test the recommendation engine
     console.log('Testing recommendation engine...');
     
-    const testProcess = spawn('python', [
+    const testProcess = spawn(pythonExec, [
       path.join(__dirname, 'recommendation_engine.py'),
       JSON.stringify({
         mode: 'test',

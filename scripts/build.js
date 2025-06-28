@@ -44,8 +44,8 @@ async function build() {
 
     // Install Python dependencies
     console.log('Installing Python dependencies...');
-    const pipCommand = os.platform() === 'win32' ? 'pip' : 'pip3';
-    await runCommand(pipCommand, ['install', '-r', 'requirements.txt']);
+    const pythonExec = os.platform() === 'win32' ? 'python' : 'python3';
+    await runCommand(pythonExec, ['-m', 'pip', 'install', '--no-cache-dir', '-r', 'requirements.txt']);
 
     // Install Node.js dependencies
     console.log('Installing Node.js dependencies...');

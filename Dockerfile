@@ -1,11 +1,14 @@
 # Backend Dockerfile
 FROM node:18.19-slim
 
-# Install Python and pip
-RUN apt-get update && \
-    apt-get install -y python3 python3-pip git && \
-    rm -rf /var/lib/apt/lists/* && \
-    python3 -m pip install --no-cache-dir --upgrade pip
+# Set noninteractive frontend
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Python, pip, and Git with minimal additional packages
+RUN apt-get update --allow-releaseinfo-change && \
+    apt-get install -y --no-install-recommends python3 python3-pip git ca-certificates && \
+    python3 -m pip install --no-cache-dir --upgrade pip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Configure Git to handle line endings
 RUN git config --global core.autocrlf false

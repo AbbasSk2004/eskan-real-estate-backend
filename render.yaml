@@ -4,9 +4,9 @@ services:
     env: node
     rootDirectory: .
     buildCommand: |
-      npm install
-      pip install --upgrade pip
-      pip install -r requirements.txt
+      npm install --omit=dev
+      python3 -m pip install --upgrade pip
+      python3 -m pip install -r requirements.txt
       node scripts/build.js
     startCommand: node index.js
     envVars:
