@@ -5,10 +5,14 @@ FROM node:18.19-slim
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Python, pip, and Git with minimal additional packages
-RUN apt-get update --allow-releaseinfo-change && \
-    apt-get install -y --no-install-recommends python3 python3-pip git ca-certificates && \
-    python3 -m pip install --no-cache-dir --upgrade pip && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    apt-get update -y --allow-releaseinfo-change --allow-releaseinfo-change-all; \
+    # Retry logic in case of intermittent network/keyserver issues
+    for i in 1 2 3; do \
+      apt-get install -y --no-install-recommends python3 python3-pip git ca-certificates && break || sleep 5; \
+    done; \
+    python3 -m pip install --no-cache-dir --upgrade pip; \
+    apt-get clean; rm -rf /var/lib/apt/lists/*
 
 # Configure Git to handle line endings
 RUN git config --global core.autocrlf false
