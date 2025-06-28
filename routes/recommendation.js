@@ -165,9 +165,12 @@ router.get('/recommended', async (req, res) => {
             data: sortedRecommendations,
             source: 'ml'
           });
+        } else {
+          logger.warn('ML engine returned empty recommendations, falling back to JavaScript');
+          throw new Error('Empty ML recommendations');
         }
       } catch (pythonError) {
-        logger.error('Python recommendation engine failed:', pythonError);
+        logger.error('Python recommendation engine failed, using JavaScript fallback:', pythonError);
         // Fall back to JavaScript implementation if Python fails
       }
 

@@ -22,9 +22,18 @@ const callPythonRecommendationEngine = async (data) => {
     // Convert data to JSON string
     const dataString = JSON.stringify(data);
     
-    // Spawn Python process (allow overriding command via env or fallback to python3)
-    const pythonCmd = process.env.PYTHON_CMD || 'python3';
+    // Determine Python command based on platform
+    let pythonCmd = process.env.PYTHON_CMD;
+    if (!pythonCmd) {
+      pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    }
+    
     logger.debug(`Spawning Python process using command: ${pythonCmd}`);
+    
+    // Set timeout for Python process (10 seconds)
+    const timeout = 10000;
+    let timeoutId;
+    
     const pythonProcess = spawn(pythonCmd, [scriptPath, dataString]);
     
     let result = '';
@@ -43,6 +52,8 @@ const callPythonRecommendationEngine = async (data) => {
 
     // Handle process completion
     pythonProcess.on('close', (code) => {
+      clearTimeout(timeoutId);
+      
       if (code !== 0) {
         logger.error(`Python process exited with code ${code}: ${error}`);
         return reject(new Error(`Python process exited with code ${code}: ${error}`));
@@ -60,9 +71,17 @@ const callPythonRecommendationEngine = async (data) => {
 
     // Handle spawn errors (e.g., command not found)
     pythonProcess.on('error', (spawnErr) => {
+      clearTimeout(timeoutId);
       logger.error(`Failed to start Python process: ${spawnErr.message}`);
       return reject(new Error(`Failed to start Python process: ${spawnErr.message}`));
     });
+    
+    // Set timeout to kill process if it takes too long
+    timeoutId = setTimeout(() => {
+      pythonProcess.kill();
+      logger.error(`Python process timed out after ${timeout}ms`);
+      reject(new Error(`Python process timed out after ${timeout}ms`));
+    }, timeout);
   });
 };
 
@@ -109,7 +128,7 @@ const sanitizePropertyData = (properties) => {
  */
 const getUserRecommendations = async (userHistory, allProperties, limit = 5) => {
   try {
-    logger.info(`Getting recommendations for user with ${userHistory.length} viewed properties`);
+    logger.info(`Getting ML recommendations for user with ${userHistory.length} viewed properties`);
     
     // Sanitize property data
     const sanitizedProperties = sanitizePropertyData(allProperties);
@@ -131,15 +150,15 @@ const getUserRecommendations = async (userHistory, allProperties, limit = 5) => 
     });
 
     if (!result.success) {
-      logger.error(`Failed to get recommendations: ${result.error || 'Unknown error'}`);
-      throw new Error(result.error || 'Failed to get recommendations');
+      logger.error(`Failed to get ML recommendations: ${result.error || 'Unknown error'}`);
+      throw new Error(result.error || 'Failed to get ML recommendations');
     }
 
-    logger.info(`Successfully got ${result.recommendations.length} recommendations`);
+    logger.info(`Successfully got ${result.recommendations.length} ML recommendations`);
     return result.recommendations;
   } catch (error) {
-    logger.error('Error getting user recommendations:', error);
-    return [];
+    logger.error('Error getting ML recommendations, will fall back to JS:', error);
+    throw error; // Let the caller handle the fallback
   }
 };
 
