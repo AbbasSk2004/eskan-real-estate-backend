@@ -40,7 +40,7 @@ services:
         sync: false
       # Python interpreter for ML engine
       - key: PYTHON_CMD
-        value: python3
+        value: /usr/bin/python3
       # API Configuration
       - key: API_BASE_URL
         value: https://eskan-real-estate-backend.onrender.com/api
