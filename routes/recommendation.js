@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../utils/supabaseClient');
+const { supabase } = require('../config/supabaseClient');
 const { getUserRecommendations, getSimilarProperties } = require('../utils/pythonRecommendationEngine');
 const logger = require('../utils/logger');
 
