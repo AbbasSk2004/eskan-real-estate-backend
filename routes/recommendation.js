@@ -3,6 +3,7 @@ const router = express.Router();
 const { supabase } = require('../config/supabaseClient');
 const { getUserRecommendations, getSimilarProperties } = require('../utils/pythonRecommendationEngine');
 const logger = require('../utils/logger');
+const { spawn } = require('child_process');
 
 // Helper function to calculate similarity between properties (fallback if Python fails)
 const calculatePropertySimilarity = (property1, property2) => {
@@ -143,6 +144,9 @@ router.get('/recommended', async (req, res) => {
         }
       }
 
+      let mlRecommendationsFailed = false;
+      let mlError = null;
+      
       try {
         logger.info('Using scikit-learn for recommendations');
         // Try using scikit-learn recommendation engine with real data
@@ -167,11 +171,14 @@ router.get('/recommended', async (req, res) => {
           });
         } else {
           logger.warn('ML engine returned empty recommendations, falling back to JavaScript');
-          throw new Error('Empty ML recommendations');
+          mlRecommendationsFailed = true;
+          mlError = new Error('Empty ML recommendations');
         }
       } catch (pythonError) {
         logger.error('Python recommendation engine failed, using JavaScript fallback:', pythonError);
         // Fall back to JavaScript implementation if Python fails
+        mlRecommendationsFailed = true;
+        mlError = pythonError;
       }
 
       // Fallback: Calculate recommendations using JavaScript
@@ -195,7 +202,9 @@ router.get('/recommended', async (req, res) => {
       res.json({ 
         success: true, 
         data: recommendations,
-        source: 'js'
+        source: 'js',
+        mlFailed: mlRecommendationsFailed,
+        mlError: mlError ? mlError.message : null
       });
     } else {
       logger.info('No user ID provided, returning recommended properties');
@@ -244,7 +253,94 @@ router.get('/recommended', async (req, res) => {
     logger.error('Error in /recommended:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Failed to get recommendations'
+      error: 'Failed to get recommendations',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Test endpoint to check Python availability
+router.get('/test-python', async (req, res) => {
+  try {
+    logger.info('Testing Python environment');
+    
+    // Determine Python command based on platform
+    let pythonCmd = process.env.PYTHON_CMD;
+    if (!pythonCmd) {
+      pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    }
+    
+    // Run a simple Python command to check version
+    const pythonProcess = spawn(pythonCmd, ['-V']);
+    
+    let result = '';
+    let error = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      result += data.toString();
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      error += data.toString();
+    });
+    
+    pythonProcess.on('close', (code) => {
+      if (code !== 0) {
+        logger.error(`Python check failed with code ${code}: ${error}`);
+        return res.status(500).json({ 
+          success: false, 
+          error: `Python check failed with code ${code}: ${error}` 
+        });
+      }
+      
+      // Also check for required modules
+      const moduleProcess = spawn(pythonCmd, ['-c', 'import numpy, pandas, sklearn, json; print("All modules loaded successfully")']);
+      
+      let moduleResult = '';
+      let moduleError = '';
+      
+      moduleProcess.stdout.on('data', (data) => {
+        moduleResult += data.toString();
+      });
+      
+      moduleProcess.stderr.on('data', (data) => {
+        moduleError += data.toString();
+      });
+      
+      moduleProcess.on('close', (moduleCode) => {
+        if (moduleCode !== 0) {
+          logger.error(`Python modules check failed: ${moduleError}`);
+          return res.status(500).json({
+            success: false,
+            pythonVersion: result || error,
+            moduleError: moduleError,
+            message: 'Required Python modules are missing'
+          });
+        }
+        
+        res.json({
+          success: true,
+          pythonVersion: result || error,
+          modulesCheck: moduleResult,
+          message: 'Python environment is working correctly'
+        });
+      });
+    });
+    
+    // Handle spawn errors
+    pythonProcess.on('error', (err) => {
+      logger.error(`Failed to start Python process: ${err.message}`);
+      res.status(500).json({ 
+        success: false, 
+        error: `Failed to start Python process: ${err.message}` 
+      });
+    });
+    
+  } catch (error) {
+    logger.error('Error testing Python:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to test Python environment' 
     });
   }
 });

@@ -28,11 +28,15 @@ const callPythonRecommendationEngine = async (data) => {
       pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
     }
     
-    logger.debug(`Spawning Python process using command: ${pythonCmd}`);
+    logger.debug(`Spawning Python process using command: ${pythonCmd}, script path: ${scriptPath}`);
     
-    // Set timeout for Python process (10 seconds)
-    const timeout = 10000;
+    // Set timeout for Python process (30 seconds - increased from 10 seconds)
+    const timeout = 30000;
     let timeoutId;
+    
+    // Log input data size for debugging
+    logger.debug(`Python input data size: ${dataString.length} characters`);
+    logger.debug(`User history items: ${(data.user_history || []).length}, Properties: ${(data.all_properties || []).length}`);
     
     const pythonProcess = spawn(pythonCmd, [scriptPath, dataString]);
     
