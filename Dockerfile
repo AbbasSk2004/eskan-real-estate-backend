@@ -4,6 +4,9 @@ FROM node:18.19-slim
 # Set noninteractive frontend
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Allow pip installs in Debian's externally-managed environment (PEP 668)
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+
 # Install Python, pip, and Git with minimal additional packages
 RUN set -eux; \
     apt-get update --allow-releaseinfo-change; \
@@ -11,7 +14,7 @@ RUN set -eux; \
     for i in 1 2 3; do \
       apt-get install -y --no-install-recommends python3 python3-pip git ca-certificates && break || sleep 5; \
     done; \
-    python3 -m pip install --no-cache-dir --upgrade pip; \
+    python3 -m pip install --no-cache-dir --upgrade pip --break-system-packages; \
     apt-get clean; rm -rf /var/lib/apt/lists/*
 
 # Configure Git to handle line endings
