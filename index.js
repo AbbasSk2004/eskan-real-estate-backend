@@ -34,6 +34,7 @@ const mapsRouter = require('./routes/maps');
 const faqRoutes = require('./routes/faq');
 const blogRoutes = require('./routes/blogs');
 const similarPropertiesRoutes = require('./routes/similar-properties');
+const recommendationRoutes = require('./routes/recommendation');
 
 // Validate required environment variables
 const requiredEnvVars = [
@@ -320,6 +321,7 @@ app.use('/api/favorites', getUserFromToken, favoriteRoutes);
 app.use('/api/maps', mapsRouter);
 app.use('/api/faqs', faqRoutes);
 app.use('/api/blogs', blogRoutes);
+app.use('/api/recommendation', recommendationRoutes);
 
 // Rate limiting (production only)
 if (process.env.NODE_ENV === 'production') {
