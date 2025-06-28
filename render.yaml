@@ -2,8 +2,7 @@ services:
   - type: web
     name: eskan-real-estate-api
     env: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: .
+    rootDirectory: backend
     envVars:
       - key: NODE_ENV
         value: production

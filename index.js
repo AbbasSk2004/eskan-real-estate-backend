@@ -55,8 +55,8 @@ const session = require('express-session');
 // Initialize Express app
 const app = express();
 
-// Tell Express it is behind a proxy so req.ip works when X-Forwarded-For is set (Render, Heroku, etc.)
-app.set('trust proxy', true);
+// Trust only the first proxy in production to satisfy express-rate-limit validation
+app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
 
 // Security middleware with correct configuration for frontend
 app.use(helmet({
