@@ -16,6 +16,7 @@
 *.yaml text eol=lf
 *.txt text eol=lf
 Dockerfile text eol=lf
+requirements.txt text eol=lf
 
 # Documentation
 *.pdf binary
