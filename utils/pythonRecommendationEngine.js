@@ -22,9 +22,10 @@ const callPythonRecommendationEngine = async (data) => {
     // Convert data to JSON string
     const dataString = JSON.stringify(data);
     
-    // Spawn Python process
-    logger.debug('Spawning Python process for recommendation engine');
-    const pythonProcess = spawn('python', [scriptPath, dataString]);
+    // Spawn Python process (allow overriding command via env or fallback to python3)
+    const pythonCmd = process.env.PYTHON_CMD || 'python3';
+    logger.debug(`Spawning Python process using command: ${pythonCmd}`);
+    const pythonProcess = spawn(pythonCmd, [scriptPath, dataString]);
     
     let result = '';
     let error = '';
@@ -55,6 +56,12 @@ const callPythonRecommendationEngine = async (data) => {
         logger.error(`Failed to parse Python output: ${result}`);
         reject(new Error(`Failed to parse Python output: ${result}`));
       }
+    });
+
+    // Handle spawn errors (e.g., command not found)
+    pythonProcess.on('error', (spawnErr) => {
+      logger.error(`Failed to start Python process: ${spawnErr.message}`);
+      return reject(new Error(`Failed to start Python process: ${spawnErr.message}`));
     });
   });
 };
