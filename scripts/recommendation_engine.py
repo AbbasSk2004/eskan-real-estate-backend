@@ -194,8 +194,12 @@ def find_similar_properties(property_id, df, feature_matrix, n=5):
         # Get index of the target property
         idx = df.index[df['id'] == property_id].tolist()[0]
         
-        # Calculate cosine similarity
-        similarities = cosine_similarity([feature_matrix[idx]], feature_matrix)[0]
+        # Ensure the row is 2-D for dense numpy arrays
+        row_vector = feature_matrix[idx]
+        if hasattr(row_vector, 'shape') and len(row_vector.shape) == 1:
+            row_vector = row_vector.reshape(1, -1)
+
+        similarities = cosine_similarity(row_vector, feature_matrix).flatten()
         
         # Get indices of most similar properties (excluding self)
         similar_indices = similarities.argsort()[::-1]
