@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Python, pip, and Git with minimal additional packages
 RUN set -eux; \
-    apt-get update -y --allow-releaseinfo-change --allow-releaseinfo-change-all; \
+    apt-get update --allow-releaseinfo-change; \
     # Retry logic in case of intermittent network/keyserver issues
     for i in 1 2 3; do \
       apt-get install -y --no-install-recommends python3 python3-pip git ca-certificates && break || sleep 5; \
