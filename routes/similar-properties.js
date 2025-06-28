@@ -8,12 +8,26 @@ const { getSimilarProperties } = require('../utils/pythonRecommendationEngine');
 // Enable CORS for this route
 router.use(cors());
 
+// Simple in-memory cache (node instance–local)
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+// Map<cacheKey, { timestamp:number, payload:object }>
+const cache = new Map();
+
 // Get similar properties
 router.get('/:id', async (req, res) => {
   try {
+    // Build cache key
     const { id } = req.params;
     const { limit = 4 } = req.query;
     const numLimit = parseInt(limit);
+    const cacheKey = `${id}_${numLimit}`;
+
+    // Serve from cache if still fresh
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION_MS) {
+      logger.debug(`Serving similar properties for ${id} from cache`);
+      return res.json(cached.payload);
+    }
 
     logger.info(`Getting similar properties for property ID: ${id}`);
 
@@ -88,7 +102,8 @@ router.get('/:id', async (req, res) => {
       .eq('property_type', currentProperty.property_type)
       .eq('verified', true)  // Only get verified properties
       .neq('id', id) // Exclude current property
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(numLimit * 15); // Fetch reasonable subset for ML to speed up
 
     if (error) {
       logger.error('Error fetching similar properties:', error);
@@ -129,11 +144,15 @@ router.get('/:id', async (req, res) => {
         }));
 
         logger.info(`Found ${transformedData.length} similar properties using scikit-learn`);
-        return res.json({
+        const payload = {
           success: true,
           data: transformedData,
           source: 'ml'
-        });
+        };
+
+        // Cache and respond
+        cache.set(cacheKey, { timestamp: Date.now(), payload });
+        return res.json(payload);
       }
     } catch (mlError) {
       logger.error('ML recommendation failed, falling back to basic filtering:', mlError);
@@ -153,11 +172,15 @@ router.get('/:id', async (req, res) => {
         }
       }));
 
-    res.json({
+    const payload = {
       success: true,
       data: transformedData,
       source: 'fallback'
-    });
+    };
+
+    // Cache and respond
+    cache.set(cacheKey, { timestamp: Date.now(), payload });
+    res.json(payload);
   } catch (err) {
     logger.error('Error fetching similar properties:', err);
     res.status(500).json({
