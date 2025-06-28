@@ -1,14 +1,9 @@
 services:
   - type: web
     name: eskan-real-estate-api
-    env: node
-    rootDirectory: .
-    buildCommand: |
-      npm install --omit=dev
-      python3 -m pip install --upgrade pip
-      python3 -m pip install -r requirements.txt
-      node scripts/build.js
-    startCommand: node index.js
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: .
     envVars:
       - key: NODE_ENV
         value: production
@@ -43,6 +38,9 @@ services:
         sync: false
       - key: SESSION_SECRET
         sync: false
+      # Python interpreter for ML engine
+      - key: PYTHON_CMD
+        value: python3
       # API Configuration
       - key: API_BASE_URL
         value: https://eskan-real-estate-backend.onrender.com/api
