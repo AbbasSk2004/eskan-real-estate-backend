@@ -73,7 +73,7 @@ const checkSession = async (req) => {
           lastname: userData.full_name?.split(' ').slice(1).join(' ') || '',
           profile_photo: userData.avatar_url || userData.picture || '',
           role: 'user',
-          status: 'active'
+          status: 'inactive'
         };
 
         const { data: createdProfile, error: createError } = await supabase

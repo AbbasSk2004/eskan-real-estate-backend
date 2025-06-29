@@ -195,16 +195,6 @@ router.post('/logout', async (req, res) => {
       }
     }
     
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      logger.error('Logout error:', error);
-      return res.status(500).json({
-        success: false,
-        message: error.message
-      });
-    }
-
     res.json({
       success: true,
       message: 'Successfully logged out'
