@@ -9,7 +9,7 @@ drop trigger if exists on_auth_user_created on auth.users;
 drop table if exists public.profiles cascade;
 drop table if exists public.property_views cascade;
 drop table if exists public.notifications cascade;
-drop table if exists public.notification_settings cascade;
+
 drop table if exists public.conversations cascade;
 drop table if exists public.messages cascade;
 drop table if exists public.contact_submissions cascade;
@@ -275,26 +275,7 @@ CREATE TABLE public.messages (
   CONSTRAINT messages_sender_fkey FOREIGN KEY (sender_id) REFERENCES public.profiles(profiles_id)
 );
 
-CREATE TABLE public.notification_settings (
-  id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  profiles_id uuid NOT NULL UNIQUE,
-  email_notifications boolean DEFAULT true,
-  push_notifications boolean DEFAULT true,
-  sms_notifications boolean DEFAULT false,
-  chat_messages boolean DEFAULT true,
-  property_updates boolean DEFAULT true,
-  system_updates boolean DEFAULT true,
-  marketing_emails boolean DEFAULT false,
-  weekly_digest boolean DEFAULT true,
-  instant_notifications boolean DEFAULT true,
-  quiet_hours_enabled boolean DEFAULT false,
-  quiet_hours_start time without time zone DEFAULT '22:00:00'::time without time zone,
-  quiet_hours_end time without time zone DEFAULT '08:00:00'::time without time zone,
-  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
-  CONSTRAINT notification_settings_pkey PRIMARY KEY (id),
-  CONSTRAINT fk_profiles_id FOREIGN KEY (profiles_id) REFERENCES public.profiles(profiles_id)
-);
+
 
 CREATE TABLE public.notifications (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -490,7 +471,7 @@ CREATE POLICY "Users can delete own favorites"
 
 -- Enable RLS for notifications
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notification_settings ENABLE ROW LEVEL SECURITY;
+
 
 -- Notification policies
 CREATE POLICY "Users can view own notifications"
@@ -501,18 +482,6 @@ CREATE POLICY "Users can update own notifications"
   ON public.notifications FOR UPDATE
   USING (auth.uid() = profiles_id);
 
--- Notification settings policies
-CREATE POLICY "Users can view own notification settings"
-  ON public.notification_settings FOR SELECT
-  USING (auth.uid() = profiles_id);
-
-CREATE POLICY "Users can update own notification settings"
-  ON public.notification_settings FOR UPDATE
-  USING (auth.uid() = profiles_id);
-
-CREATE POLICY "Users can insert own notification settings"
-  ON public.notification_settings FOR INSERT
-  WITH CHECK (auth.uid() = profiles_id);
 
 -- Add indexes for notifications
 CREATE INDEX IF NOT EXISTS idx_notifications_profiles_id ON public.notifications(profiles_id);
@@ -521,7 +490,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_read ON public.notifications(read);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at);
 
 -- Add indexes for notification settings
-CREATE INDEX IF NOT EXISTS idx_notification_settings_profiles_id ON public.notification_settings(profiles_id);
+
 
 -- Enable RLS for agents table
 ALTER TABLE public.agents ENABLE ROW LEVEL SECURITY;
@@ -1894,10 +1863,7 @@ DECLARE
     settings_record record;
     should_send boolean := true;
 BEGIN
-    -- Get user's notification settings
-    SELECT * INTO settings_record 
-    FROM notification_settings 
-    WHERE profiles_id = user_id;
+    
     
     -- If no settings exist, use default (send all notifications)
     IF settings_record IS NULL THEN
@@ -2106,7 +2072,7 @@ GRANT EXECUTE ON FUNCTION notify_agent_application_status() TO authenticated;
 -- Add indexes for better notification performance
 CREATE INDEX IF NOT EXISTS idx_notifications_type_created ON public.notifications(type, created_at);
 CREATE INDEX IF NOT EXISTS idx_notifications_profiles_read ON public.notifications(profiles_id, read);
-CREATE INDEX IF NOT EXISTS idx_notification_settings_profiles ON public.notification_settings(profiles_id);
+
 
 -- Create function to get notification statistics
 CREATE OR REPLACE FUNCTION get_notification_stats(user_id uuid)
