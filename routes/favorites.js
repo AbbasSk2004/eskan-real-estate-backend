@@ -90,7 +90,7 @@ router.post('/:propertyId', async (req, res) => {
 
     const { data, error } = await supabasePublic
       .from('favorites')
-      .insert([{
+      .insert([{        
         property_id: propertyId,
         profiles_id: user.id
       }])
@@ -102,7 +102,7 @@ router.post('/:propertyId', async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Added to favorites',
-      data
+      data: data || null  // data could be null if the insert succeeded but notification trigger failed
     });
   } catch (err) {
     logger.error('Error adding to favorites:', err);

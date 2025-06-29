@@ -20,7 +20,7 @@ drop table if exists public.favorites cascade;
 drop table if exists public.properties cascade;
 drop table if exists public.property_inquiries cascade;
 drop table if exists public.testimonials cascade;
-drop table if exists public.user_preferences cascade;
+
 drop table if exists public.payments cascade;
 
 -- Create tables
@@ -420,18 +420,7 @@ CREATE TABLE public.testimonials (
   CONSTRAINT testimonials_profiles_id_fkey FOREIGN KEY (profiles_id) REFERENCES public.profiles(profiles_id)
 );
 
-CREATE TABLE public.user_preferences (
-  id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  profiles_id uuid,
-  email_notifications boolean DEFAULT true,
-  push_notifications boolean DEFAULT true,
-  notification_types jsonb DEFAULT '{"messages": true, "favorites": true, "property_updates": true}'::jsonb,
-  theme text DEFAULT 'light'::text,
-  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-  updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-  CONSTRAINT user_preferences_pkey PRIMARY KEY (id),
-  CONSTRAINT fk_profiles_id FOREIGN KEY (profiles_id) REFERENCES public.profiles(profiles_id)
-);
+
 
 -- Add indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_properties_type ON public.properties(property_type);
@@ -734,7 +723,7 @@ alter table public.properties enable row level security;
 alter table public.messages enable row level security;
 alter table public.property_views enable row level security;
 alter table public.notifications enable row level security;
-alter table public.user_preferences enable row level security;
+
 alter table public.testimonials enable row level security;
 alter table public.property_inquiries enable row level security;
 
