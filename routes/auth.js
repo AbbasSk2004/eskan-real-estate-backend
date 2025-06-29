@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const logger = require('../utils/logger');
+const cron = require('node-cron');
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -156,7 +157,7 @@ router.post('/register', async (req, res) => {
         profile
       },
       session: authData.session,
-      message: 'Registration successful. Please check your email for the verification code.'
+      message: 'Registration successful. Please check your email for the verification code. Note: You must verify your email within 1 hour or your account will be automatically deleted.'
     });
   } catch (err) {
     logger.error('Registration error:', err);
@@ -660,6 +661,15 @@ router.post('/verify-supabase', async (req, res) => {
 
     if (error) {
       logger.error('Email verification error:', error);
+      
+      // Check if error is due to user not found (might have been deleted after 1 hour)
+      if (error.message.includes('user not found')) {
+        return res.status(400).json({
+          success: false,
+          message: 'Verification failed. Your account may have been deleted because you did not verify within 1 hour. Please register again.'
+        });
+      }
+      
       return res.status(400).json({
         success: false,
         message: error.message || 'Failed to verify email'
@@ -719,6 +729,15 @@ router.post('/verify-otp', async (req, res) => {
 
     if (error) {
       logger.error('OTP verification error:', error);
+      
+      // Check if error is due to user not found (might have been deleted after 1 hour)
+      if (error.message.includes('user not found')) {
+        return res.status(400).json({
+          success: false,
+          message: 'Verification failed. Your account may have been deleted because you did not verify within 1 hour. Please register again.'
+        });
+      }
+      
       return res.status(400).json({
         success: false,
         message: error.message || 'Failed to verify email code'
@@ -864,6 +883,92 @@ router.post('/reset-password', async (req, res) => {
       success: false,
       message: 'Failed to reset password'
     });
+  }
+});
+
+// Admin endpoint to manually trigger cleanup of unverified users
+router.post('/admin/cleanup-unverified', async (req, res) => {
+  try {
+    // Check if request is from an admin
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
+      });
+    }
+
+    // Check if user is an admin
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('profiles_id', user.id)
+      .single();
+
+    if (profileError || profile?.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin access required'
+      });
+    }
+
+    // Call the database function to delete unverified users
+    const { data, error } = await supabase.rpc('delete_unverified_users');
+    
+    if (error) {
+      logger.error('Error deleting unverified users:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to delete unverified users'
+      });
+    }
+    
+    const deletedCount = data;
+    return res.json({
+      success: true,
+      message: `Successfully deleted ${deletedCount} unverified users`,
+      deletedCount
+    });
+  } catch (err) {
+    logger.error('Failed to run unverified users cleanup job:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to run cleanup job'
+    });
+  }
+});
+
+// Schedule job to delete unverified users after 1 hour
+cron.schedule('0 * * * *', async () => {
+  try {
+    logger.info('Running scheduled job: delete unverified users');
+    
+    // Call the database function to delete unverified users
+    const { data, error } = await supabase.rpc('delete_unverified_users');
+    
+    if (error) {
+      logger.error('Error deleting unverified users:', error);
+      return;
+    }
+    
+    const deletedCount = data;
+    if (deletedCount > 0) {
+      logger.info(`Successfully deleted ${deletedCount} unverified users`);
+    } else {
+      logger.info('No unverified users to delete');
+    }
+  } catch (err) {
+    logger.error('Failed to run unverified users cleanup job:', err);
   }
 });
 

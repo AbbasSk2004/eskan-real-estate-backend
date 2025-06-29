@@ -2256,3 +2256,50 @@ GRANT EXECUTE ON FUNCTION public.change_user_password(uuid, text, text) TO servi
 
 -- Add comment for the function
 COMMENT ON FUNCTION public.change_user_password(uuid, text, text) IS 'Changes a user''s password if the current password is correct';
+
+-- Create function to delete unverified users after 1 hour
+CREATE OR REPLACE FUNCTION public.delete_unverified_users()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  users_count integer;
+  deleted_user record;
+BEGIN
+  -- First, log which users will be deleted
+  FOR deleted_user IN (
+    SELECT id, email, created_at
+    FROM auth.users
+    WHERE 
+      email_confirmed_at IS NULL AND
+      created_at < (now() - interval '1 hour')
+  ) LOOP
+    RAISE NOTICE 'Deleting unverified user: % (%) registered at %', 
+      deleted_user.email, 
+      deleted_user.id, 
+      deleted_user.created_at;
+  END LOOP;
+
+  -- Delete users who registered more than 1 hour ago but haven't verified their email
+  WITH deleted_users AS (
+    DELETE FROM auth.users
+    WHERE 
+      email_confirmed_at IS NULL AND
+      created_at < (now() - interval '1 hour')
+    RETURNING id
+  )
+  SELECT count(*) INTO users_count FROM deleted_users;
+  
+  -- Log the deletion count
+  IF users_count > 0 THEN
+    RAISE NOTICE 'Deleted % unverified users', users_count;
+  END IF;
+  
+  RETURN users_count;
+END;
+$$;
+
+-- Grant necessary permissions
+GRANT EXECUTE ON FUNCTION public.delete_unverified_users() TO service_role;
+COMMENT ON FUNCTION public.delete_unverified_users() IS 'Deletes users who have not verified their email within 1 hour of registration';
