@@ -408,7 +408,17 @@ app.post('/api/auth/register', async (req, res) => {
   const userId = data.user.id;
   const { error: profileError } = await supabase
     .from('profiles')
-    .insert([{ id: userId, first_name: firstName, last_name: lastName, email, phone }]);
+    .upsert([{ 
+      profiles_id: userId, 
+      firstname: firstName, 
+      lastname: lastName, 
+      email, 
+      phone 
+    }], 
+    { 
+      onConflict: 'profiles_id',
+      ignoreDuplicates: false 
+    });
   if (profileError) return res.status(400).json({ message: profileError.message });
 
   res.status(201).json({ user: data.user, message: 'Registration successful. Please verify your email.' });

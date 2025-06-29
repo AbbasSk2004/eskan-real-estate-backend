@@ -123,7 +123,7 @@ router.post('/register', async (req, res) => {
     // Create profile in profiles table
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .insert([
+      .upsert([
         {
           profiles_id: authData.user.id,
           firstname,
@@ -131,7 +131,11 @@ router.post('/register', async (req, res) => {
           phone,
           email
         }
-      ])
+      ], 
+      { 
+        onConflict: 'profiles_id',
+        ignoreDuplicates: false
+      })
       .select()
       .single();
 
@@ -454,7 +458,7 @@ router.post('/google/callback', async (req, res) => {
     if (!userProfile) {
       const { data: newProfile, error: createError } = await supabase
         .from('profiles')
-        .insert([{
+        .upsert([{
           profiles_id: user.id,
           email: user.email,
           firstname: user.user_metadata?.full_name?.split(' ')[0] || '',
@@ -462,7 +466,11 @@ router.post('/google/callback', async (req, res) => {
           profile_photo: user.user_metadata?.avatar_url,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }])
+        }],
+        {
+          onConflict: 'profiles_id',
+          ignoreDuplicates: false
+        })
         .select()
         .single();
 
@@ -544,16 +552,20 @@ router.post('/verify-token', async (req, res) => {
     if (!profile) {
       const { error: insertError } = await supabase
         .from('profiles')
-        .insert([
+        .upsert([
           {
-            id: user.id,
+            profiles_id: user.id,
             email: user.email,
-            first_name: user.profile.firstname,
-            last_name: user.profile.lastname,
-            avatar_url: user.profile.profile_photo,
-            provider: user.provider
+            firstname: user.profile.firstname,
+            lastname: user.profile.lastname,
+            profile_photo: user.profile.profile_photo,
+            role: 'user',
+            status: 'active'
           }
-        ]);
+        ], {
+          onConflict: 'profiles_id',
+          ignoreDuplicates: false
+        });
 
       if (insertError) {
         logger.error('Profile creation error:', insertError);

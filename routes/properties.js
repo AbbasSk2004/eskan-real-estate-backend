@@ -53,7 +53,10 @@ const verifySession = async (req) => {
 
         const { data: createdProfile, error: createError } = await supabase
           .from('profiles')
-          .insert([newProfile])
+          .upsert([newProfile], {
+            onConflict: 'profiles_id',
+            ignoreDuplicates: false
+          })
           .select()
           .single();
 
