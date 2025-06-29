@@ -1,4 +1,4 @@
-const { getUserRecommendations, getSimilarProperties } = require('../utils/pythonRecommendationEngine');
+const { getUserRecommendations } = require('../utils/pythonRecommendationEngine');
 const { supabase } = require('../config/supabaseClient');
 const logger = require('../utils/logger');
 
@@ -32,12 +32,6 @@ async function testRecommendations() {
     const recommendations = await getUserRecommendations(mockHistory, properties);
     logger.info(`Got ${recommendations.length} recommendations`);
     logger.info('Recommendations:', recommendations);
-    
-    // Test similar properties
-    logger.info('Testing similar properties...');
-    const similarProperties = await getSimilarProperties(properties[0].id, properties);
-    logger.info(`Got ${similarProperties.length} similar properties`);
-    logger.info('Similar properties:', similarProperties);
     
     logger.info('Recommendation engine test completed successfully');
   } catch (err) {

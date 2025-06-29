@@ -3,7 +3,6 @@ const router = express.Router();
 const { supabase } = require('../config/supabaseClient');
 const logger = require('../utils/logger');
 const cors = require('cors');
-const { getSimilarProperties } = require('../utils/pythonRecommendationEngine');
 
 // Enable CORS for this route
 router.use(cors());
@@ -113,54 +112,8 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    // Try to use scikit-learn for more accurate recommendations
-    try {
-      logger.info('Using scikit-learn for similar properties');
-      
-      // Include current property in the dataset for the ML algorithm
-      const allProperties = [currentProperty, ...similarProperties];
-      
-      // Get similar property IDs using scikit-learn
-      const similarIds = await getSimilarProperties(id, allProperties, numLimit);
-      
-      if (similarIds && similarIds.length > 0) {
-        // Filter properties to get only the ML-recommended ones
-        const mlRecommendedProperties = similarProperties.filter(prop => 
-          similarIds.includes(prop.id)
-        );
-        
-        // Sort them in the same order as the IDs returned by ML
-        const sortedRecommendations = similarIds.map(recId => 
-          mlRecommendedProperties.find(prop => prop.id === recId)
-        ).filter(Boolean);
-        
-        // Transform data to match frontend expectations
-        const transformedData = sortedRecommendations.map(property => ({
-          ...property,
-          agent: {
-            name: `${property.profiles?.firstname || ''} ${property.profiles?.lastname || ''}`.trim(),
-            photo: property.profiles?.profile_photo
-          }
-        }));
-
-        logger.info(`Found ${transformedData.length} similar properties using scikit-learn`);
-        const payload = {
-          success: true,
-          data: transformedData,
-          source: 'ml'
-        };
-
-        // Cache and respond
-        cache.set(cacheKey, { timestamp: Date.now(), payload });
-        return res.json(payload);
-      }
-    } catch (mlError) {
-      logger.error('ML recommendation failed, falling back to basic filtering:', mlError);
-      // Continue with fallback method if ML fails
-    }
-
-    // Fallback: Simple filtering and limit
-    logger.info('Using fallback method for similar properties');
+    // Simple filtering (no ML) and limit
+    logger.info('Using basic filtering for similar properties');
     // Transform data to match frontend expectations
     const transformedData = similarProperties
       .slice(0, numLimit)
@@ -174,8 +127,7 @@ router.get('/:id', async (req, res) => {
 
     const payload = {
       success: true,
-      data: transformedData,
-      source: 'fallback'
+      data: transformedData
     };
 
     // Cache and respond

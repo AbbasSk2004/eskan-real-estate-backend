@@ -383,17 +383,6 @@ def main():
             recommendations = get_recommendations_for_user(user_history, all_properties, limit)
             print(json.dumps({"success": True, "recommendations": recommendations}))
         
-        elif mode == 'similar_properties':
-            property_id = input_data.get('property_id')
-            all_properties = input_data.get('all_properties', [])
-            limit = input_data.get('limit', 5)
-            
-            df = preprocess_properties(all_properties)
-            feature_matrix, _ = create_feature_matrix(df)
-            similar_ids = find_similar_properties(property_id, df, feature_matrix, limit)
-            
-            print(json.dumps({"success": True, "similar_properties": similar_ids}))
-        
         elif mode == 'test':
             test_result = test_engine()
             print(json.dumps(test_result))

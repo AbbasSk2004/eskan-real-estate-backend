@@ -166,41 +166,6 @@ const getUserRecommendations = async (userHistory, allProperties, limit = 5) => 
   }
 };
 
-/**
- * Get similar properties to a specific property
- * @param {String} propertyId - The ID of the property to find similar properties for
- * @param {Array} allProperties - All available properties
- * @param {Number} limit - Maximum number of similar properties to return
- * @returns {Promise<Array>} - Array of similar property IDs
- */
-const getSimilarProperties = async (propertyId, allProperties, limit = 5) => {
-  try {
-    logger.info(`Getting similar properties for property ID: ${propertyId}`);
-    
-    // Sanitize property data
-    const sanitizedProperties = sanitizePropertyData(allProperties);
-    
-    const result = await callPythonRecommendationEngine({
-      mode: 'similar_properties',
-      property_id: propertyId,
-      all_properties: sanitizedProperties,
-      limit
-    });
-
-    if (!result.success) {
-      logger.error(`Failed to get similar properties: ${result.error || 'Unknown error'}`);
-      throw new Error(result.error || 'Failed to get similar properties');
-    }
-
-    logger.info(`Successfully got ${result.similar_properties.length} similar properties`);
-    return result.similar_properties;
-  } catch (error) {
-    logger.error('Error getting similar properties:', error);
-    return [];
-  }
-};
-
 module.exports = {
-  getUserRecommendations,
-  getSimilarProperties
+  getUserRecommendations
 };

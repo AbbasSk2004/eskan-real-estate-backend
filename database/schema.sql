@@ -777,14 +777,7 @@ create policy "Users can send messages"
   on public.messages for insert
   with check (auth.uid() = sender_id);
 
--- User preferences policies
-create policy "Users can view own preferences"
-  on public.user_preferences for select
-  using (auth.uid() = profiles_id);
 
-create policy "Users can update own preferences"
-  on public.user_preferences for update
-  using (auth.uid() = profiles_id);
 
 -- Testimonials policies
 create policy "Testimonials are viewable by everyone"
