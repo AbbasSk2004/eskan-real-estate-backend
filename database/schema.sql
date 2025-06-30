@@ -2070,3 +2070,128 @@ $$;
 -- Grant necessary permissions
 GRANT EXECUTE ON FUNCTION public.delete_unverified_users() TO service_role;
 COMMENT ON FUNCTION public.delete_unverified_users() IS 'Deletes users who have not verified their email within 1 hour of registration';
+CREATE OR REPLACE FUNCTION notify_property_favorited() RETURNS trigger AS $$
+DECLARE
+    property_owner_id uuid;
+    property_title text;
+    favoriter_name text;
+    favoriter_profile record;
+BEGIN
+    -- Get property owner ID and title
+    SELECT profiles_id, title INTO property_owner_id, property_title
+    FROM public.properties 
+    WHERE id = NEW.property_id;
+
+    -- Get favoriter's name
+    SELECT firstname, lastname INTO favoriter_profile
+    FROM public.profiles 
+    WHERE profiles_id = NEW.profiles_id;
+
+    favoriter_name := COALESCE(favoriter_profile.firstname || ' ' || favoriter_profile.lastname, 'Someone');
+
+    -- Don't notify if user is favoriting their own property
+    IF property_owner_id != NEW.profiles_id THEN
+        INSERT INTO public.notifications (
+            profiles_id,
+            type,
+            title,
+            message,
+            data
+        ) VALUES (
+            property_owner_id,
+            'favorite_added',
+            'Property Added to Favorites',
+            favoriter_name || ' added your property "' || property_title || '" to their favorites',
+            jsonb_build_object(
+                'property_id', NEW.property_id,
+                'favoriter_id', NEW.profiles_id,
+                'favoriter_name', favoriter_name
+            )
+        );
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION notify_testimonial_approved() RETURNS trigger AS $$
+BEGIN
+    -- Only send notification when status changes to approved
+    IF NEW.approved = true AND (OLD.approved = false OR OLD.approved IS NULL) THEN
+        INSERT INTO public.notifications (
+            profiles_id,
+            type,
+            title,
+            message,
+            data
+        ) VALUES (
+            NEW.profiles_id,
+            'testimonial_approved',
+            'Testimonial Approved',
+            'Your testimonial has been approved and is now visible on our website!',
+            jsonb_build_object(
+                'testimonial_id', NEW.id,
+                'rating', NEW.rating
+            )
+        );
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION notify_agent_application_status() RETURNS trigger AS $$
+BEGIN
+    -- Only send notification when status changes
+    IF OLD.status IS DISTINCT FROM NEW.status THEN
+        CASE NEW.status
+            WHEN 'approved' THEN
+                INSERT INTO public.notifications (
+                    profiles_id,
+                    type,
+                    title,
+                    message,
+                    data
+                ) VALUES (
+                    NEW.profiles_id,
+                    'agent_application_approved',
+                    'Congratulations! Your agent application has been approved. You can now access agent features.',
+                    jsonb_build_object('agent_id', NEW.id, 'status', NEW.status)
+                );
+            WHEN 'rejected' THEN
+                INSERT INTO public.notifications (
+                    profiles_id,
+                    type,
+                    title,
+                    message,
+                    data
+                ) VALUES (
+                    NEW.profiles_id,
+                    'agent_application_rejected',
+                    'Your agent application was not approved at this time. You may reapply in the future.',
+                    jsonb_build_object('agent_id', NEW.id, 'status', NEW.status)
+                );
+            ELSE
+                RETURN NEW;
+        END CASE;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Now, recreate the triggers to use the new functions
+DROP TRIGGER IF EXISTS notify_property_favorited ON public.favorites;
+CREATE TRIGGER notify_property_favorited
+AFTER INSERT ON public.favorites
+FOR EACH ROW EXECUTE FUNCTION notify_property_favorited();
+
+DROP TRIGGER IF EXISTS notify_testimonial_approved ON public.testimonials;
+CREATE TRIGGER notify_testimonial_approved
+AFTER UPDATE ON public.testimonials
+FOR EACH ROW EXECUTE FUNCTION notify_testimonial_approved();
+
+DROP TRIGGER IF EXISTS notify_agent_application_status ON public.agents;
+CREATE TRIGGER notify_agent_application_status
+AFTER UPDATE ON public.agents
+FOR EACH ROW EXECUTE FUNCTION notify_agent_application_status();
