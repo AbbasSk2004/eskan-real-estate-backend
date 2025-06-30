@@ -371,10 +371,12 @@ router.post('/update-status', async (req, res) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
     if (userError || !user) {
-      logger.error('Invalid token in status update:', userError);
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
+      // Token might already be invalidated (e.g., after password change or logout).
+      // Treat this gracefully to prevent unnecessary 401 errors on the client.
+      logger.warn('Skipping status update – invalid or expired token.');
+      return res.json({
+        success: true,
+        message: 'Token already invalid; status update skipped.'
       });
     }
 
