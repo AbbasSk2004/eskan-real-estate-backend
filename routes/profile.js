@@ -280,6 +280,18 @@ router.post('/change-password', async (req, res) => {
       });
     }
 
+    // Immediately mark user status as inactive – the current session will be invalidated,
+    // so front-end logout may fail to update status. Doing it here guarantees consistency.
+    try {
+      await supabase
+        .from('profiles')
+        .update({ status: 'inactive' })
+        .eq('profiles_id', profile.profiles_id);
+    } catch (statusErr) {
+      // Log but don't block password change success.
+      logger.warn('Failed to set status inactive after password change:', statusErr);
+    }
+
     res.json({
       success: true,
       message: 'Password changed successfully'
