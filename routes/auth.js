@@ -342,29 +342,23 @@ router.get('/verify', async (req, res) => {
 // Update user status endpoint
 router.post('/update-status', async (req, res) => {
   try {
-    // Handle both FormData and JSON requests
-    let token, status;
+    // First try to get token from Authorization header
+    const authHeader = req.headers.authorization;
+    let token = null;
+    let status = req.body.status || 'inactive';
     
-    // Check if request is from FormData (from sendBeacon)
-    if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
-      token = req.body.token;
-      status = req.body.status;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
     } else {
-      // Regular JSON request
-      ({ token, status } = req.body);
+      // Fall back to token from request body
+      token = req.body.token;
     }
     
     if (!token) {
-      // Also check Authorization header as fallback
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        token = authHeader.split(' ')[1];
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: 'Token is required'
-        });
-      }
+      return res.status(400).json({
+        success: false,
+        message: 'Token is required'
+      });
     }
 
     // Get user from token
