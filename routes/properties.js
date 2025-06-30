@@ -335,8 +335,10 @@ router.get('/', async (req, res) => {
       priceMax,
       areaMin,
       areaMax,
+      village,
       bedrooms,
       bathrooms,
+      features,
       sortBy = 'newest',
       verified = true
     } = req.query;
@@ -400,6 +402,9 @@ router.get('/', async (req, res) => {
     if (city) {
       query = query.eq('city', city);
     }
+    if (village) {
+      query = query.eq('village', village);
+    }
     if (priceMin) {
       query = query.gte('price', parseFloat(priceMin));
     }
@@ -417,6 +422,14 @@ router.get('/', async (req, res) => {
     }
     if (bathrooms) {
       query = query.gte('bathrooms', parseInt(bathrooms));
+    }
+    if (features) {
+      const featureList = features.split(',').filter(Boolean);
+      if (featureList.length) {
+        const featureObj = {};
+        featureList.forEach(f => { featureObj[f] = true; });
+        query = query.contains('features', featureObj);
+      }
     }
     if (keyword) {
       query = query.ilike('title', `%${keyword}%`);
