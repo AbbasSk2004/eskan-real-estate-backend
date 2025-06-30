@@ -111,6 +111,7 @@ router.get('/featured', async (req, res) => {
         loading_docks,
         water_source,
         crop_types,
+        view,
         created_at,
         profiles:profiles!properties_profiles_id_fkey (
           firstname,
@@ -191,6 +192,7 @@ router.get('/recommended', async (req, res) => {
         loading_docks,
         water_source,
         crop_types,
+        view,
         created_at,
         profiles:profiles!properties_profiles_id_fkey (
           firstname,
@@ -279,6 +281,7 @@ router.get('/user/properties', async (req, res) => {
         storage_area,
         water_source,
         crop_types,
+        view,
         verified,
         created_at,
         profiles!properties_profiles_id_fkey (
@@ -373,6 +376,7 @@ router.get('/', async (req, res) => {
         storage_area,
         water_source,
         crop_types,
+        view,
         created_at,
         profiles:profiles_id (
           firstname,
