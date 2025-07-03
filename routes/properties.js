@@ -112,6 +112,7 @@ router.get('/featured', async (req, res) => {
         water_source,
         crop_types,
         view,
+        profiles_id,
         created_at,
         profiles:profiles!properties_profiles_id_fkey (
           firstname,
@@ -193,6 +194,7 @@ router.get('/recommended', async (req, res) => {
         water_source,
         crop_types,
         view,
+        profiles_id,
         created_at,
         profiles:profiles!properties_profiles_id_fkey (
           firstname,
@@ -275,6 +277,7 @@ router.get('/user/properties', async (req, res) => {
         city,
         governate,
         main_image,
+        profiles_id,
         meeting_rooms,
         parking_spaces,
         shop_front_width,
@@ -370,6 +373,7 @@ router.get('/', async (req, res) => {
         city,
         governate,
         main_image,
+        profiles_id,
         meeting_rooms,
         parking_spaces,
         shop_front_width,
