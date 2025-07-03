@@ -90,6 +90,7 @@ router.get('/recommended', async (req, res) => {
             crop_types,
             city,
             governate,
+            profiles_id,
             main_image,
             created_at,
             is_featured,
@@ -103,6 +104,7 @@ router.get('/recommended', async (req, res) => {
           `)
           .eq('verified', true)
           .eq('recommended', true)
+          .neq('profiles_id', user_id)
           .order('created_at', { ascending: false })
           .limit(limit);
 
@@ -143,6 +145,7 @@ router.get('/recommended', async (req, res) => {
           crop_types,
           city,
           governate,
+          profiles_id,
           main_image,
           created_at,
           is_featured,
@@ -154,7 +157,8 @@ router.get('/recommended', async (req, res) => {
             profile_photo
           )
         `)
-        .eq('verified', true);
+        .eq('verified', true)
+        .neq('profiles_id', user_id);
 
       if (propertiesError) {
         logger.error('Error fetching all properties:', propertiesError);
@@ -213,7 +217,8 @@ router.get('/recommended', async (req, res) => {
       // Fallback: Calculate recommendations using JavaScript
       logger.info('Using JavaScript fallback for recommendations');
       const recommendations = allProperties
-        .filter(prop => !viewsData.find(view => view.property_id === prop.id))
+        .filter(prop => !viewsData.find(view => view.property_id === prop.id)
+          && prop.profiles_id !== user_id)
         .map(property => {
           const totalScore = viewedProperties.reduce((score, view) => {
             return score + calculatePropertySimilarity(view.property, property);
@@ -266,6 +271,7 @@ router.get('/recommended', async (req, res) => {
           crop_types,
           city,
           governate,
+          profiles_id,
           main_image,
           created_at,
           is_featured,
@@ -279,6 +285,7 @@ router.get('/recommended', async (req, res) => {
         `)
         .eq('verified', true)
         .eq('recommended', true)
+        .neq('profiles_id', user_id)
         .order('created_at', { ascending: false })
         .limit(limit);
 

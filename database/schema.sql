@@ -1102,7 +1102,13 @@ CREATE INDEX IF NOT EXISTS idx_notifications_profiles_id ON public.notifications
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
+    -- Safely attempt to set NEW.updated_at; if the table lacks this column, ignore the error
+    BEGIN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+    EXCEPTION WHEN undefined_column THEN
+        -- Column does not exist on this table; do nothing
+        NULL;
+    END;
     RETURN NEW;
 END;
 $$ language 'plpgsql';
@@ -1358,7 +1364,12 @@ CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(read);
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = CURRENT_TIMESTAMP;
+  -- Attempt to set updated_at; silently skip if the column is absent
+  BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+  EXCEPTION WHEN undefined_column THEN
+    NULL; -- no updated_at column on this table
+  END;
   RETURN NEW;
 END;
 $$ language 'plpgsql';
@@ -1676,13 +1687,10 @@ CREATE TRIGGER trigger_new_contact_submission_notification
     FOR EACH ROW
     EXECUTE FUNCTION notify_new_contact_submission();
 
--- 5. Trigger for new agent applications
-DROP TRIGGER IF EXISTS trigger_new_agent_application_notification ON public.agents;
-CREATE TRIGGER trigger_new_agent_application_notification
-    AFTER INSERT ON public.agents
-    FOR EACH ROW
-    EXECUTE FUNCTION notify_new_agent_application();
-
+CREATE OR REPLACE TRIGGER agent_application_notification_trigger
+AFTER INSERT ON public.agents
+FOR EACH ROW
+EXECUTE FUNCTION notify_new_agent_application();
 -- Grant necessary permissions
 GRANT EXECUTE ON FUNCTION notify_new_property() TO authenticated;
 GRANT EXECUTE ON FUNCTION notify_new_testimonial() TO authenticated;
@@ -1734,12 +1742,12 @@ DECLARE
 BEGIN
     -- Get property owner ID and title
     SELECT profiles_id, title INTO property_owner_id, property_title
-    FROM properties 
+    FROM public.properties 
     WHERE id = NEW.property_id;
     
     -- Get favoriter's name
     SELECT firstname, lastname INTO favoriter_profile
-    FROM profiles 
+    FROM public.profiles 
     WHERE profiles_id = NEW.profiles_id;
     
     favoriter_name := COALESCE(favoriter_profile.firstname || ' ' || favoriter_profile.lastname, 'Someone');
@@ -1856,12 +1864,7 @@ CREATE TRIGGER trigger_testimonial_approval_notification
     FOR EACH ROW
     EXECUTE FUNCTION notify_testimonial_approved();
 
--- Trigger for agent application status changes
-DROP TRIGGER IF EXISTS trigger_agent_status_notification ON public.agents;
-CREATE TRIGGER trigger_agent_status_notification
-    AFTER UPDATE ON public.agents
-    FOR EACH ROW
-    EXECUTE FUNCTION notify_agent_application_status();
+
 
 -- Grant necessary permissions
 GRANT EXECUTE ON FUNCTION check_and_send_notification(uuid, text, text, text, text, jsonb) TO authenticated;
@@ -2140,9 +2143,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION notify_agent_application_status() RETURNS trigger AS $$
+-- Replace the existing function with this corrected version
+CREATE OR REPLACE FUNCTION notify_agent_application_status()
+RETURNS trigger AS $$
 BEGIN
-    -- Only send notification when status changes
+    -- Only send a notification when the status actually changes
     IF OLD.status IS DISTINCT FROM NEW.status THEN
         CASE NEW.status
             WHEN 'approved' THEN
@@ -2155,6 +2160,7 @@ BEGIN
                 ) VALUES (
                     NEW.profiles_id,
                     'agent_application_approved',
+                    'Agent Application Approved',
                     'Congratulations! Your agent application has been approved. You can now access agent features.',
                     jsonb_build_object('agent_id', NEW.id, 'status', NEW.status)
                 );
@@ -2168,17 +2174,18 @@ BEGIN
                 ) VALUES (
                     NEW.profiles_id,
                     'agent_application_rejected',
-                    'Your agent application was not approved at this time. You may reapply in the future.',
+                    'Agent Application Rejected',
+                    'Your agent application was not approved at this time. You may re-apply in the future.',
                     jsonb_build_object('agent_id', NEW.id, 'status', NEW.status)
                 );
             ELSE
-                RETURN NEW;
+                RETURN NEW;  -- No notification for other status values
         END CASE;
     END IF;
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Now, recreate the triggers to use the new functions
 DROP TRIGGER IF EXISTS notify_property_favorited ON public.favorites;
@@ -2195,3 +2202,52 @@ DROP TRIGGER IF EXISTS notify_agent_application_status ON public.agents;
 CREATE TRIGGER notify_agent_application_status
 AFTER UPDATE ON public.agents
 FOR EACH ROW EXECUTE FUNCTION notify_agent_application_status();
+-- allow inserts when request comes from localhost, CI or your server
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Server can insert any profile"
+  ON public.profiles FOR INSERT
+  USING (current_setting('request.jwt.claim.role', true) = 'service_role')
+  WITH CHECK (true);
+  CREATE OR REPLACE FUNCTION notify_admin_on_profile_creation()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.admin_notifications (
+        admin_id,
+        title,
+        message,
+        type,
+        action_url
+    ) VALUES (
+        (SELECT profiles_id FROM public.profiles WHERE role = 'admin' LIMIT 1), -- Assuming there's at least one admin
+        'New User Profile Created',
+        'A new user profile for ' || NEW.email || ' has been created and verified.',
+        'user_profile_creation',
+        '/admin/users/' || NEW.profiles_id
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER after_profile_creation
+AFTER INSERT ON public.profiles
+FOR EACH ROW
+WHEN (NEW.email IS NOT NULL AND NEW.status = 'active') -- Assuming 'active' means email is verified
+EXECUTE FUNCTION notify_admin_on_profile_creation();
+
+ALTER TABLE public.property_inquiries 
+ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+-- Add a trigger to automatically update the timestamp when the row is modified
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
+
+CREATE TRIGGER set_property_inquiries_timestamp
+BEFORE UPDATE ON public.property_inquiries
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
