@@ -91,9 +91,8 @@ const allowedOrigins = parseOrigins(process.env.FRONTEND_URL);
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
     ? [
-        'https://eskan-real-estate.vercel.app', // Vercel's default domain
-        /\.vercel\.app$/, // Any Vercel preview deployments
-        'https://eskan-real-estate-react.vercel.app', // React website
+        'https://eskanrealestate.netlify.app', // Netlify domain
+        /\.netlify\.app$/, // Any Netlify preview deployments
         'http://localhost:3000', // Development website
         ...allowedOrigins // Mobile app URLs from FRONTEND_URL
       ]

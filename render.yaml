@@ -25,7 +25,7 @@ services:
         sync: false
       # Frontend Configuration (Web + Mobile)
       - key: FRONTEND_URL
-        value: '["https://eskan-real-estate.vercel.app", "https://eskan-real-estate-react.vercel.app", "http://localhost:3000", "exp://localhost:8081", "exp://192.168.1.7:8081"]'
+        value: '["https://eskanrealestate.netlify.app", "http://localhost:3000", "exp://localhost:8081", "exp://192.168.1.7:8081"]'
       # Google Services
       - key: GOOGLE_MAPS_API_KEY
         sync: false
