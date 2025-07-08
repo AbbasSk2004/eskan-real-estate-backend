@@ -160,6 +160,8 @@ async function extractCoordinatesFromUrl(url) {
       }
     }
 
+  } // <--- close short URL handling if-block
+
   // Pattern 1: @lat,lng format
   let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (match) {
