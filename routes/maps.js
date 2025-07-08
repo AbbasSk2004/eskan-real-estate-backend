@@ -185,7 +185,7 @@ async function extractCoordinatesFromUrl(url) {
   }
 
   // Pattern 3: q=lat,lng format
-  match = url.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  match = url.match(/[?&](?:q|query)=(?:loc:)?(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (match) {
     const coords = {
       lat: parseFloat(match[1]),
