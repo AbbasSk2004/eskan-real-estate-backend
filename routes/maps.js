@@ -206,6 +206,20 @@ async function extractCoordinatesFromUrl(url) {
     return coords;
   }
 
+  // Pattern 5: Generic lat,lng search anywhere in URL
+  // Matches first occurrence of two decimal numbers separated by a comma (or URL-encoded comma)
+  match = url.match(/(-?\d{1,3}\.\d+)[ ,%2C]+(-?\d{1,3}\.\d+)/);
+  if (match) {
+    const possibleLat = parseFloat(match[1]);
+    const possibleLng = parseFloat(match[2]);
+    // Basic sanity check on latitude/longitude ranges
+    if (Math.abs(possibleLat) <= 90 && Math.abs(possibleLng) <= 180) {
+      const coords = { lat: possibleLat, lng: possibleLng };
+      // console.log('Found coordinates using generic pattern:', coords);
+      return coords;
+    }
+  }
+
   // Pattern 5: Extract from place name in URL
   if (url.includes('/place/')) {
     try {
