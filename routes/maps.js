@@ -114,7 +114,35 @@ function extractCoordinatesFromIframe(url) {
 
 // Helper function to extract coordinates from a URL
 async function extractCoordinatesFromUrl(url) {
-  // console.log('Attempting to extract coordinates from:', url);
+  // Handle Google Maps short URLs (maps.app.goo.gl) by resolving the redirect first
+  if (url.includes('maps.app.goo.gl')) {
+    try {
+      // Perform a HEAD/GET request without following redirects to get the Location header
+      const resp = await axios.get(url, {
+        maxRedirects: 0,
+        timeout: 10000,
+        validateStatus: (status) => status >= 300 && status < 400 // Only treat 3xx as valid here
+      });
+
+      const redirectedUrl = resp.headers?.location || resp.response?.headers?.location;
+      if (redirectedUrl) {
+        // Recursively attempt to extract coordinates from the resolved URL
+        return await extractCoordinatesFromUrl(redirectedUrl);
+      }
+    } catch (err) {
+      // axios throws an error when maxRedirects = 0 and a redirect occurs – capture it here
+      if (err.response && err.response.status >= 300 && err.response.status < 400 && err.response.headers?.location) {
+        const redirectedUrl = err.response.headers.location;
+        try {
+          return await extractCoordinatesFromUrl(redirectedUrl);
+        } catch (innerErr) {
+          console.error('Failed to resolve short Google Maps URL:', innerErr.message);
+        }
+      } else {
+        console.error('Error resolving Google Maps short URL:', err.message);
+      }
+    }
+  }
 
   // Pattern 1: @lat,lng format
   let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
