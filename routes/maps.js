@@ -139,15 +139,26 @@ async function extractCoordinatesFromUrl(url) {
           timeout: 15000,
           headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ESKAN-Real-Estate/1.0)' }
         });
+        // If axios followed redirects, attempt to use the final URL first
         const finalUrl = followResp.request?.res?.responseUrl;
         if (finalUrl && finalUrl !== url) {
-          return await extractCoordinatesFromUrl(finalUrl);
+          const coordsFromFinal = await extractCoordinatesFromUrl(finalUrl);
+          if (coordsFromFinal) return coordsFromFinal;
+        }
+
+        // Fallback: parse HTML for an explicit redirect (e.g., inside a meta tag or JS)
+        if (typeof followResp.data === 'string') {
+          const urlMatch = followResp.data.match(/https?:\/\/www\.google\.com\/maps[^\s"'>]+/);
+          if (urlMatch) {
+            const extractedUrl = urlMatch[0];
+            const coordsFromHtml = await extractCoordinatesFromUrl(extractedUrl);
+            if (coordsFromHtml) return coordsFromHtml;
+          }
         }
       } catch (innerErr) {
         console.error('Error following redirects for short Google Maps URL:', innerErr.message);
       }
     }
-  }
 
   // Pattern 1: @lat,lng format
   let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
