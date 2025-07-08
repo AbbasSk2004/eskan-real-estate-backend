@@ -114,53 +114,12 @@ function extractCoordinatesFromIframe(url) {
 
 // Helper function to extract coordinates from a URL
 async function extractCoordinatesFromUrl(url) {
-  // Handle Google Maps short URLs (maps.app.goo.gl) by resolving the redirect first
+  // Skip Google Maps short URLs (e.g., maps.app.goo.gl)
+  // We no longer follow redirects for these links; caller should supply
+  // a full Google Maps URL or an embed iframe URL instead.
   if (url.includes('maps.app.goo.gl') || url.includes('goo.gl/maps')) {
-    try {
-      // First attempt: grab Location header without following redirects
-      const resp = await axios.get(url, {
-        maxRedirects: 0,
-        timeout: 10000,
-        validateStatus: (s) => s >= 300 && s < 400
-      });
-      const redirectedUrl = resp.headers?.location || resp.response?.headers?.location;
-      if (redirectedUrl) {
-        return await extractCoordinatesFromUrl(redirectedUrl);
-      }
-    } catch (err) {
-      // If the above fails, try following redirects automatically to get final URL
-      if (err.response && err.response.status >= 300 && err.response.status < 400 && err.response.headers?.location) {
-        const redirectedUrl = err.response.headers.location;
-        return await extractCoordinatesFromUrl(redirectedUrl);
-      }
-      try {
-        const followResp = await axios.get(url, {
-          maxRedirects: 5,
-          timeout: 15000,
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ESKAN-Real-Estate/1.0)' }
-        });
-        // If axios followed redirects, attempt to use the final URL first
-        const finalUrl = followResp.request?.res?.responseUrl;
-        if (finalUrl && finalUrl !== url) {
-          const coordsFromFinal = await extractCoordinatesFromUrl(finalUrl);
-          if (coordsFromFinal) return coordsFromFinal;
-        }
-
-        // Fallback: parse HTML for an explicit redirect (e.g., inside a meta tag or JS)
-        if (typeof followResp.data === 'string') {
-          const urlMatch = followResp.data.match(/https?:\/\/www\.google\.com\/maps[^\s"'>]+/);
-          if (urlMatch) {
-            const extractedUrl = urlMatch[0];
-            const coordsFromHtml = await extractCoordinatesFromUrl(extractedUrl);
-            if (coordsFromHtml) return coordsFromHtml;
-          }
-        }
-      } catch (innerErr) {
-        console.error('Error following redirects for short Google Maps URL:', innerErr.message);
-      }
-    }
-
-  } // <--- close short URL handling if-block
+    return null; // early-exit so that downstream patterns are not attempted
+  }
 
   // Pattern 1: @lat,lng format
   let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
