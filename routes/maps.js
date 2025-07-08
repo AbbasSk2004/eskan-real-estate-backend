@@ -115,31 +115,36 @@ function extractCoordinatesFromIframe(url) {
 // Helper function to extract coordinates from a URL
 async function extractCoordinatesFromUrl(url) {
   // Handle Google Maps short URLs (maps.app.goo.gl) by resolving the redirect first
-  if (url.includes('maps.app.goo.gl')) {
+  if (url.includes('maps.app.goo.gl') || url.includes('goo.gl/maps')) {
     try {
-      // Perform a HEAD/GET request without following redirects to get the Location header
+      // First attempt: grab Location header without following redirects
       const resp = await axios.get(url, {
         maxRedirects: 0,
         timeout: 10000,
-        validateStatus: (status) => status >= 300 && status < 400 // Only treat 3xx as valid here
+        validateStatus: (s) => s >= 300 && s < 400
       });
-
       const redirectedUrl = resp.headers?.location || resp.response?.headers?.location;
       if (redirectedUrl) {
-        // Recursively attempt to extract coordinates from the resolved URL
         return await extractCoordinatesFromUrl(redirectedUrl);
       }
     } catch (err) {
-      // axios throws an error when maxRedirects = 0 and a redirect occurs – capture it here
+      // If the above fails, try following redirects automatically to get final URL
       if (err.response && err.response.status >= 300 && err.response.status < 400 && err.response.headers?.location) {
         const redirectedUrl = err.response.headers.location;
-        try {
-          return await extractCoordinatesFromUrl(redirectedUrl);
-        } catch (innerErr) {
-          console.error('Failed to resolve short Google Maps URL:', innerErr.message);
+        return await extractCoordinatesFromUrl(redirectedUrl);
+      }
+      try {
+        const followResp = await axios.get(url, {
+          maxRedirects: 5,
+          timeout: 15000,
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ESKAN-Real-Estate/1.0)' }
+        });
+        const finalUrl = followResp.request?.res?.responseUrl;
+        if (finalUrl && finalUrl !== url) {
+          return await extractCoordinatesFromUrl(finalUrl);
         }
-      } else {
-        console.error('Error resolving Google Maps short URL:', err.message);
+      } catch (innerErr) {
+        console.error('Error following redirects for short Google Maps URL:', innerErr.message);
       }
     }
   }
