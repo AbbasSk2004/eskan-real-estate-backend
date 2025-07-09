@@ -13,20 +13,69 @@ const calculatePropertySimilarity = (property1, property2) => {
   if (property1.property_type === property2.property_type) score += 5;
   
   // Price range comparison (within 20%)
-  const priceRange = Math.abs(property1.price - property2.price) / property1.price;
-  if (priceRange <= 0.2) score += 4;
+  if (property1.price > 0) {
+    const priceRange = Math.abs(property1.price - property2.price) / property1.price;
+    if (priceRange <= 0.2) score += 4;
+  }
   
   // Location comparison
   if (property1.governate === property2.governate) score += 3;
   if (property1.city === property2.city) score += 2;
   
-  // Features comparison
-  if (property1.bedrooms === property2.bedrooms) score += 1;
-  if (property1.bathrooms === property2.bathrooms) score += 1;
-  if (property1.area && property2.area) {
+  // Basic features comparison
+  if (property1.bedrooms === property2.bedrooms) score += 1.5;
+  if (property1.bathrooms === property2.bathrooms) score += 1.5;
+  
+  // Area comparison (within 20%)
+  if (property1.area && property2.area && property1.area > 0) {
     const areaRange = Math.abs(property1.area - property2.area) / property1.area;
-    if (areaRange <= 0.2) score += 1;
+    if (areaRange <= 0.2) score += 2;
   }
+  
+  // Additional numeric features comparison
+  if (property1.floor === property2.floor && property1.floor > 0) score += 1;
+  
+  if (property1.year_built && property2.year_built && property1.year_built > 0) {
+    const yearDiff = Math.abs(property1.year_built - property2.year_built);
+    if (yearDiff <= 5) score += 1.5;
+  }
+  
+  if (property1.meeting_rooms === property2.meeting_rooms && property1.meeting_rooms > 0) score += 1;
+  if (property1.parking_spaces === property2.parking_spaces && property1.parking_spaces > 0) score += 1.2;
+  
+  // Shop features comparison
+  if (property1.shop_front_width && property2.shop_front_width && property1.shop_front_width > 0) {
+    const widthDiff = Math.abs(property1.shop_front_width - property2.shop_front_width) / property1.shop_front_width;
+    if (widthDiff <= 0.2) score += 1;
+  }
+  
+  if (property1.storage_area && property2.storage_area && property1.storage_area > 0) {
+    const storageDiff = Math.abs(property1.storage_area - property2.storage_area) / property1.storage_area;
+    if (storageDiff <= 0.2) score += 1;
+  }
+  
+  if (property1.units === property2.units && property1.units > 0) score += 1;
+  if (property1.elevators === property2.elevators && property1.elevators > 0) score += 1;
+  
+  // Land features comparison
+  if (property1.plot_size && property2.plot_size && property1.plot_size > 0) {
+    const plotDiff = Math.abs(property1.plot_size - property2.plot_size) / property1.plot_size;
+    if (plotDiff <= 0.2) score += 1.5;
+  }
+  
+  if (property1.land_type === property2.land_type && property1.land_type) score += 2;
+  
+  // Industrial features comparison
+  if (property1.ceiling_height && property2.ceiling_height && property1.ceiling_height > 0) {
+    const heightDiff = Math.abs(property1.ceiling_height - property2.ceiling_height) / property1.ceiling_height;
+    if (heightDiff <= 0.2) score += 1;
+  }
+  
+  if (property1.loading_docks === property2.loading_docks && property1.loading_docks > 0) score += 1;
+  
+  // Agricultural features comparison
+  if (property1.water_source === property2.water_source && property1.water_source) score += 1;
+  if (property1.crop_types === property2.crop_types && property1.crop_types) score += 1.5;
 
   return score;
 };

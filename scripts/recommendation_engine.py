@@ -20,7 +20,21 @@ FEATURE_WEIGHTS = {
     'bedrooms': 1.5,
     'bathrooms': 1.5,
     'location': 4.0,  # Combined weight for governate/city
-    'features': 2.0   # For JSON features
+    'features': 2.0,   # For JSON features
+    'floor': 1.0,
+    'year_built': 1.5,
+    'meeting_rooms': 1.0,
+    'parking_spaces': 1.2,
+    'shop_front_width': 1.0,
+    'storage_area': 1.0,
+    'units': 1.0,
+    'elevators': 1.0,
+    'plot_size': 1.5,
+    'land_type': 2.0,
+    'ceiling_height': 1.0,
+    'loading_docks': 1.0,
+    'water_source': 1.0,
+    'crop_types': 1.5
 }
 
 # Set maximum number of properties to process to avoid timeout
@@ -51,7 +65,7 @@ def preprocess_properties(properties_data):
         return df
     
     try:
-        # Handle missing values
+        # Handle missing values for basic features
         if 'price' in df.columns:
             df['price'] = pd.to_numeric(df['price'], errors='coerce')
             df['price'] = df['price'].fillna(df['price'].median() if not df['price'].empty else 0)
@@ -76,6 +90,20 @@ def preprocess_properties(properties_data):
         else:
             df['bathrooms'] = 0
         
+        # Handle additional numeric features
+        additional_numeric_features = [
+            'floor', 'year_built', 'meeting_rooms', 'parking_spaces', 
+            'shop_front_width', 'storage_area', 'units', 'elevators', 
+            'plot_size', 'ceiling_height', 'loading_docks'
+        ]
+        
+        for feature in additional_numeric_features:
+            if feature in df.columns:
+                df[feature] = pd.to_numeric(df[feature], errors='coerce')
+                df[feature] = df[feature].fillna(df[feature].median() if not df[feature].empty else 0)
+            else:
+                df[feature] = 0
+        
         # Ensure property_type exists
         if 'property_type' not in df.columns:
             df['property_type'] = 'Unknown'
@@ -95,6 +123,14 @@ def preprocess_properties(properties_data):
         
         # Create a combined location feature
         df['location'] = df['governate'] + '_' + df['city']
+        
+        # Handle categorical features
+        categorical_features = ['land_type', 'water_source', 'crop_types']
+        for feature in categorical_features:
+            if feature in df.columns:
+                df[feature] = df[feature].fillna('Unknown')
+            else:
+                df[feature] = 'Unknown'
         
         # Extract features from JSON if available
         if 'features' in df.columns:
@@ -142,8 +178,16 @@ def create_feature_matrix(df):
     
     try:
         # Define which columns are numeric vs categorical
-        numeric_features = ['price', 'area', 'bedrooms', 'bathrooms', 'features_count']
-        categorical_features = ['property_type', 'location']
+        numeric_features = [
+            'price', 'area', 'bedrooms', 'bathrooms', 'features_count',
+            'floor', 'year_built', 'meeting_rooms', 'parking_spaces', 
+            'shop_front_width', 'storage_area', 'units', 'elevators', 
+            'plot_size', 'ceiling_height', 'loading_docks'
+        ]
+        
+        categorical_features = [
+            'property_type', 'location', 'land_type', 'water_source', 'crop_types'
+        ]
         
         # Filter to include only columns that exist in the dataframe
         numeric_features = [col for col in numeric_features if col in df.columns]

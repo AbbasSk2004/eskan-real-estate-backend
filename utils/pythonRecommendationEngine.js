@@ -107,7 +107,23 @@ const sanitizePropertyData = (properties) => {
       governate: prop.governate || '',
       city: prop.city || '',
       created_at: prop.created_at || new Date().toISOString(),
-      is_featured: !!prop.is_featured
+      is_featured: !!prop.is_featured,
+      // Additional numeric features
+      floor: typeof prop.floor === 'number' ? prop.floor : 0,
+      year_built: typeof prop.year_built === 'number' ? prop.year_built : 0,
+      meeting_rooms: typeof prop.meeting_rooms === 'number' ? prop.meeting_rooms : 0,
+      parking_spaces: typeof prop.parking_spaces === 'number' ? prop.parking_spaces : 0,
+      shop_front_width: typeof prop.shop_front_width === 'number' ? prop.shop_front_width : 0,
+      storage_area: typeof prop.storage_area === 'number' ? prop.storage_area : 0,
+      units: typeof prop.units === 'number' ? prop.units : 0,
+      elevators: typeof prop.elevators === 'number' ? prop.elevators : 0,
+      plot_size: typeof prop.plot_size === 'number' ? prop.plot_size : 0,
+      ceiling_height: typeof prop.ceiling_height === 'number' ? prop.ceiling_height : 0,
+      loading_docks: typeof prop.loading_docks === 'number' ? prop.loading_docks : 0,
+      // Additional categorical features
+      land_type: prop.land_type || '',
+      water_source: prop.water_source || '',
+      crop_types: prop.crop_types || ''
     };
     
     // Handle features as a string
