@@ -1,57 +1,78 @@
 const { Server } = require('ws');
 const url = require('url');
-const { createClient } = require('@supabase/supabase-js');
-const logger = require('./utils/logger');
-
-// Supabase client for token verification
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const authService = require('./services/auth.service');
+const User = require('./models/user.model');
 
 // In-module variable so other modules can import sendToUser even before setup runs
 let sendToUser = () => {};
 
+/**
+ * Authenticate an access-token (JWT) using the backend auth service.
+ * Defined outside setupWebSocket so it can be used in the upgrade handler.
+ * @param {string} token
+ * @returns {Promise<string|null>} user id or null if invalid
+ */
+const authenticate = async (token) => {
+  if (!token) return null;
+  try {
+    const payload = authService.verifyAccessToken(token);
+    if (!payload?.sub) return null;
+
+    // Ensure user still exists and is active
+    const user = await User.findById(payload.sub);
+    if (!user) return null;
+
+    return user._id;
+  } catch (err) {
+    console.error('WebSocket auth error:', err);
+    return null;
+  }
+};
+
 function setupWebSocket(server) {
-  // Create a WebSocket server that shares the existing HTTP server
-  const wss = new Server({ server });
+  // Use noServer mode so we control the upgrade path explicitly.
+  // This prevents Express middleware (helmet, morgan, etc.) from
+  // intercepting WebSocket upgrade requests as regular HTTP GETs.
+  const wss = new Server({ noServer: true });
 
   // Map<userId, Set<ws>>
   const userSockets = new Map();
 
-  /**
-   * Authenticate an access-token (JWT) with Supabase.
-   * @param {string} token
-   * @returns {Promise<string|null>} user id or null if invalid
-   */
-  const authenticate = async (token) => {
-    if (!token) return null;
-    try {
-      const { data, error } = await supabase.auth.getUser(token);
-      if (error || !data?.user) return null;
-      return data.user.id;
-    } catch (err) {
-      logger.error('WebSocket auth error:', err);
-      return null;
-    }
-  };
+  // Handle HTTP upgrade requests BEFORE Express can respond
+  server.on('upgrade', async (req, socket, head) => {
+    const { pathname, query } = url.parse(req.url, true);
 
-  wss.on('connection', async (ws, req) => {
-    const { query } = url.parse(req.url, true);
-    const token = query.token;
-
-    const userId = await authenticate(token);
-    if (!userId) {
-      ws.close(4401, 'Unauthorized'); // 4401: custom code for auth failure
+    // Only accept upgrades on the /ws path
+    if (pathname !== '/ws') {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+      socket.destroy();
       return;
     }
+
+    // Authenticate via ?token= query parameter
+    const userId = await authenticate(query.token);
+    if (!userId) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    // Complete the WebSocket upgrade
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      ws.userId = userId;
+      wss.emit('connection', ws, req);
+    });
+  });
+
+  wss.on('connection', (ws, req) => {
+    const userId = ws.userId;
 
     // Store socket
     if (!userSockets.has(userId)) {
       userSockets.set(userId, new Set());
     }
     userSockets.get(userId).add(ws);
-    logger.info(`WebSocket connected: ${userId}`);
+    console.log(`WebSocket connected: ${userId}`);
 
     ws.on('close', () => {
       const set = userSockets.get(userId);
@@ -59,12 +80,11 @@ function setupWebSocket(server) {
         set.delete(ws);
         if (set.size === 0) userSockets.delete(userId);
       }
-      logger.info(`WebSocket disconnected: ${userId}`);
+      console.log(`WebSocket disconnected: ${userId}`);
     });
 
-    // Optional: listen for pings or client messages
+    // Listen for pings or client messages
     ws.on('message', (data) => {
-      // Echo pings or ignore
       try {
         const { type } = JSON.parse(data.toString());
         if (type === 'ping') {
@@ -89,7 +109,7 @@ function setupWebSocket(server) {
     });
   };
 
-  logger.info('🔌 WebSocket server initialised');
+  console.log('🔌 WebSocket server initialised (path: /ws)');
 }
 
 module.exports = {
@@ -99,4 +119,4 @@ module.exports = {
    * Safe no-op if the user has no active sockets.
    */
   sendToUser: (...args) => sendToUser(...args)
-}; 
+};

@@ -1,7 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const logger = require('./logger');
 
 /**
  * Calls the Python recommendation engine and returns the results
@@ -15,7 +14,7 @@ const callPythonRecommendationEngine = async (data) => {
     
     // Check if the script exists
     if (!fs.existsSync(scriptPath)) {
-      logger.error('Python recommendation engine script not found');
+      console.error('Python recommendation engine script not found');
       return reject(new Error('Python recommendation engine script not found'));
     }
 
@@ -28,15 +27,15 @@ const callPythonRecommendationEngine = async (data) => {
       pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
     }
     
-    logger.debug(`Spawning Python process using command: ${pythonCmd}, script path: ${scriptPath}`);
+    console.debug(`Spawning Python process using command: ${pythonCmd}, script path: ${scriptPath}`);
     
     // Set timeout for Python process (30 seconds - increased from 10 seconds)
     const timeout = 30000;
     let timeoutId;
     
     // Log input data size for debugging
-    logger.debug(`Python input data size: ${dataString.length} characters`);
-    logger.debug(`User history items: ${(data.user_history || []).length}, Properties: ${(data.all_properties || []).length}`);
+    console.debug(`Python input data size: ${dataString.length} characters`);
+    console.debug(`User history items: ${(data.user_history || []).length}, Properties: ${(data.all_properties || []).length}`);
     
     const pythonProcess = spawn(pythonCmd, [scriptPath, dataString]);
     
@@ -51,7 +50,7 @@ const callPythonRecommendationEngine = async (data) => {
     // Collect error messages
     pythonProcess.stderr.on('data', (data) => {
       error += data.toString();
-      logger.error(`Python error: ${data.toString()}`);
+      console.error(`Python error: ${data.toString()}`);
     });
 
     // Handle process completion
@@ -59,16 +58,16 @@ const callPythonRecommendationEngine = async (data) => {
       clearTimeout(timeoutId);
       
       if (code !== 0) {
-        logger.error(`Python process exited with code ${code}: ${error}`);
+        console.error(`Python process exited with code ${code}: ${error}`);
         return reject(new Error(`Python process exited with code ${code}: ${error}`));
       }
 
       try {
         const parsedResult = JSON.parse(result);
-        logger.debug('Successfully parsed Python output');
+        console.debug('Successfully parsed Python output');
         resolve(parsedResult);
       } catch (err) {
-        logger.error(`Failed to parse Python output: ${result}`);
+        console.error(`Failed to parse Python output: ${result}`);
         reject(new Error(`Failed to parse Python output: ${result}`));
       }
     });
@@ -76,14 +75,14 @@ const callPythonRecommendationEngine = async (data) => {
     // Handle spawn errors (e.g., command not found)
     pythonProcess.on('error', (spawnErr) => {
       clearTimeout(timeoutId);
-      logger.error(`Failed to start Python process: ${spawnErr.message}`);
+      console.error(`Failed to start Python process: ${spawnErr.message}`);
       return reject(new Error(`Failed to start Python process: ${spawnErr.message}`));
     });
     
     // Set timeout to kill process if it takes too long
     timeoutId = setTimeout(() => {
       pythonProcess.kill();
-      logger.error(`Python process timed out after ${timeout}ms`);
+      console.error(`Python process timed out after ${timeout}ms`);
       reject(new Error(`Python process timed out after ${timeout}ms`));
     }, timeout);
   });
@@ -148,7 +147,7 @@ const sanitizePropertyData = (properties) => {
  */
 const getUserRecommendations = async (userHistory, allProperties, limit = 5) => {
   try {
-    logger.info(`Getting ML recommendations for user with ${userHistory.length} viewed properties`);
+    console.log(`Getting ML recommendations for user with ${userHistory.length} viewed properties`);
     
     // Sanitize property data
     const sanitizedProperties = sanitizePropertyData(allProperties);
@@ -170,14 +169,14 @@ const getUserRecommendations = async (userHistory, allProperties, limit = 5) => 
     });
 
     if (!result.success) {
-      logger.error(`Failed to get ML recommendations: ${result.error || 'Unknown error'}`);
+      console.error(`Failed to get ML recommendations: ${result.error || 'Unknown error'}`);
       throw new Error(result.error || 'Failed to get ML recommendations');
     }
 
-    logger.info(`Successfully got ${result.recommendations.length} ML recommendations`);
+    console.log(`Successfully got ${result.recommendations.length} ML recommendations`);
     return result.recommendations;
   } catch (error) {
-    logger.error('Error getting ML recommendations, will fall back to JS:', error);
+    console.error('Error getting ML recommendations, will fall back to JS:', error);
     throw error; // Let the caller handle the fallback
   }
 };
