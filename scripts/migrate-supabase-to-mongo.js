@@ -60,6 +60,8 @@ async function main() {
 
   const client = await pool.connect();
   try {
+    const authUsersById = await fetchAuthUsers(client);
+
     for (const migration of migrations) {
       if (only.length > 0 && !only.includes(migration.key)) {
         continue;
@@ -79,7 +81,7 @@ async function main() {
         continue;
       }
 
-      await migration.handler(rows);
+      await migration.handler(rows, authUsersById);
       console.log(`Completed ${migration.key}`);
     }
   } finally {
@@ -99,20 +101,60 @@ async function fetchRows(client, tableName) {
   return res.rows;
 }
 
-async function migrateUsers(rows) {
+async function fetchAuthUsers(client) {
+  try {
+    const tableExists = await hasTableInSchema(client, 'users', 'auth');
+    if (!tableExists) {
+      console.log('auth.users table not found; continuing without auth email fallback');
+      return {};
+    }
+
+    const res = await client.query(`
+      SELECT id, email, email_confirmed_at
+      FROM auth.users
+    `);
+
+    return res.rows.reduce((acc, row) => {
+      if (row?.id) {
+        acc[String(row.id)] = row;
+      }
+      return acc;
+    }, {});
+  } catch (error) {
+    console.warn('Unable to read auth.users for email fallback:', error.message);
+    return {};
+  }
+}
+
+async function hasTableInSchema(client, tableName, schemaName = 'public') {
+  const res = await client.query('SELECT to_regclass($1) AS table_name', [`${schemaName}.${tableName}`]);
+  return Boolean(res.rows[0]?.table_name);
+}
+
+async function migrateUsers(rows, authUsersById = {}) {
   for (const row of rows) {
-    const id = row.profiles_id || row.id || row.user_id;
+    const id = row.profiles_id || row.user_id;
     if (!id) continue;
+
+    const authUser = authUsersById[String(id)] || null;
+    const resolvedEmail = normalizeEmail(row.email, row.user_email, authUser?.email);
 
     const doc = {
       _id: String(id),
-      email: normalizeEmail(row.email || row.user_email || `${id}@migrated.local`),
+      email: resolvedEmail || `${id}@migrated.local`,
       firstName: getString(row.firstname, row.first_name, row.firstName),
       lastName: getString(row.lastname, row.last_name, row.lastName),
       phone: getString(row.phone, row.phone_number, row.phoneNumber),
       role: normalizeRole(getString(row.role, row.user_role)),
       status: normalizeStatus(getString(row.status)),
-      emailVerified: Boolean(getBoolean(row.email_verified, row.emailVerified, true)),
+      emailVerified: Boolean(
+        getBoolean(
+          row.email_verified,
+          row.emailVerified,
+          authUser?.email_confirmed_at ? true : undefined,
+          true
+        )
+      ),
       profilePhoto: normalizePhoto(getString(row.profile_photo, row.profilePhoto)),
       lastLoginAt: toDate(row.last_login, row.last_login_at)
     };

@@ -26,9 +26,15 @@ async function main() {
       ]
     }).select('_id email role emailVerified').lean();
 
-    console.log(`Found ${usersToFix.length} user(s) without a passwordHash`);
+    const unverifiedWithPassword = await User.find({
+      emailVerified: { $ne: true },
+      passwordHash: { $exists: true, $nin: [null, ''] }
+    }).select('_id email role emailVerified').lean();
 
-    if (!usersToFix.length) {
+    console.log(`Found ${usersToFix.length} user(s) without a passwordHash`);
+    console.log(`Found ${unverifiedWithPassword.length} verified-password user(s) with emailVerified=false`);
+
+    if (!usersToFix.length && !unverifiedWithPassword.length) {
       console.log('No password repair needed');
       return;
     }
@@ -38,25 +44,54 @@ async function main() {
       return;
     }
 
-    const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10));
+    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
+    let updatedPasswordCount = 0;
+    let verifiedCount = 0;
 
-    const result = await User.updateMany(
-      {
-        $or: [
-          { passwordHash: { $exists: false } },
-          { passwordHash: null },
-          { passwordHash: '' }
-        ]
-      },
-      {
-        $set: {
-          passwordHash,
-          emailVerified: true
+    if (usersToFix.length) {
+      const passwordHash = await bcrypt.hash(password, saltRounds);
+      const result = await User.updateMany(
+        {
+          $or: [
+            { passwordHash: { $exists: false } },
+            { passwordHash: null },
+            { passwordHash: '' }
+          ]
+        },
+        {
+          $set: {
+            passwordHash,
+            emailVerified: true
+          },
+          $unset: {
+            emailVerificationToken: '',
+            emailVerificationTokenExpires: ''
+          }
         }
-      }
-    );
+      );
+      updatedPasswordCount = result.modifiedCount;
+    }
 
-    console.log(`Updated ${result.modifiedCount} user(s)`);
+    if (unverifiedWithPassword.length) {
+      const verifyResult = await User.updateMany(
+        {
+          emailVerified: { $ne: true },
+          passwordHash: { $exists: true, $nin: [null, ''] },
+          emailVerificationToken: { $exists: false }
+        },
+        {
+          $set: { emailVerified: true },
+          $unset: {
+            emailVerificationToken: '',
+            emailVerificationTokenExpires: ''
+          }
+        }
+      );
+      verifiedCount = verifyResult.modifiedCount;
+    }
+
+    console.log(`Updated ${updatedPasswordCount} user(s) with default password`);
+    console.log(`Marked ${verifiedCount} migrated user(s) as emailVerified`);
     console.log('Password repair complete');
   } finally {
     await disconnectMongo();

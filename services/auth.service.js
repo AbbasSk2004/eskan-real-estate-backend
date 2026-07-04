@@ -26,12 +26,46 @@ const comparePassword = async (password, hash) => {
   return bcrypt.compare(password, hash);
 };
 
+const normalizeProfilePhoto = (photo) => {
+  if (!photo) return null;
+  if (typeof photo === 'string') return photo;
+  if (typeof photo === 'object') {
+    return photo.url || photo.secure_url || photo.path || photo.src || photo.image_url || null;
+  }
+  return null;
+};
+
 const sanitizeUser = (user) => {
   if (!user) return null;
   // Convert Mongoose document to plain object and remove sensitive fields
   const obj = user.toObject ? user.toObject() : { ...user };
-  const { passwordHash, refreshTokens, __v, ...rest } = obj;
-  return rest;
+  const { passwordHash, refreshTokens, emailVerificationToken, emailVerificationTokenExpires, passwordResetToken, passwordResetExpires, __v, ...rest } = obj;
+
+  const profilePhotoObject = rest.profilePhoto || rest.profile_photo || null;
+  const profilePhotoUrl = normalizeProfilePhoto(profilePhotoObject);
+  const userId = rest._id || rest.id;
+
+  // Provide snake_case fields for legacy frontends while keeping camelCase aliases
+  return {
+    id: userId,
+    _id: userId,
+    email: rest.email || null,
+    firstname: rest.firstName || rest.firstname || null,
+    lastname: rest.lastName || rest.lastname || null,
+    firstName: rest.firstName || rest.firstname || null,
+    lastName: rest.lastName || rest.lastname || null,
+    phone: rest.phone || null,
+    profile_photo: profilePhotoUrl,
+    profilePhoto: profilePhotoObject,
+    role: rest.role || null,
+    status: rest.status || null,
+    emailVerified: rest.emailVerified,
+    is_featured: rest.isFeatured || rest.is_featured || false,
+    isFeatured: rest.isFeatured || rest.is_featured || false,
+    lastLoginAt: rest.lastLoginAt || null,
+    createdAt: rest.createdAt || null,
+    updatedAt: rest.updatedAt || null
+  };
 };
 
 const signAccessToken = (user) => {
@@ -266,12 +300,6 @@ const login = async ({ email, password }) => {
     throw err;
   }
 
-  if (!user.emailVerified && user.role !== 'admin') {
-    const err = new Error('Email not verified. Please check your inbox for the verification code.');
-    err.code = 'EMAIL_NOT_VERIFIED';
-    throw err;
-  }
-
   if (!user.passwordHash) {
     const err = new Error('Password not set, please reset your password');
     err.code = 'PASSWORD_NOT_SET';
@@ -283,6 +311,26 @@ const login = async ({ email, password }) => {
     const err = new Error('Invalid credentials');
     err.code = 'INVALID_CREDENTIALS';
     throw err;
+  }
+
+  // Only block login for new registrations that still have a pending OTP.
+  // Migrated Supabase users typically have no verification token even if
+  // emailVerified was not backfilled during migration.
+  const pendingEmailVerification =
+    !user.emailVerified &&
+    user.role !== 'admin' &&
+    Boolean(user.emailVerificationToken);
+
+  if (pendingEmailVerification) {
+    const err = new Error('Email not verified. Please check your inbox for the verification code.');
+    err.code = 'EMAIL_NOT_VERIFIED';
+    throw err;
+  }
+
+  if (!user.emailVerified && user.role !== 'admin') {
+    user.emailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationTokenExpires = undefined;
   }
 
   user.lastLoginAt = new Date();
@@ -353,6 +401,7 @@ module.exports = {
   revokeRefreshToken,
   comparePassword,
   hashPassword,
+  sanitizeUser,
   verifyEmailOtp,
   resendEmailVerification
 };

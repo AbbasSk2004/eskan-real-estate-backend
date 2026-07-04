@@ -75,7 +75,12 @@ router.post('/login', async (req, res) => {
     return res.json(buildAuthResponse(user, tokens));
   } catch (err) {
     console.error('Login error', err);
-    const status = err.code === 'INVALID_CREDENTIALS' ? 401 : err.code === 'PASSWORD_NOT_SET' ? 400 : 500;
+    const statusByCode = {
+      INVALID_CREDENTIALS: 401,
+      EMAIL_NOT_VERIFIED: 403,
+      PASSWORD_NOT_SET: 400
+    };
+    const status = statusByCode[err.code] || 500;
     return res.status(status).json({ success: false, error: err.code || 'server_error', message: err.message });
   }
 });
@@ -106,7 +111,7 @@ router.post('/refresh', async (req, res) => {
 
 // Verify access token and return current user
 router.get('/verify', requireAuth, async (req, res) => {
-  return res.json({ success: true, user: req.user });
+  return res.json({ success: true, user: authService.sanitizeUser(req.user) });
 });
 
 // Update user status (e.g., active/inactive) - used by frontend for presence tracking
