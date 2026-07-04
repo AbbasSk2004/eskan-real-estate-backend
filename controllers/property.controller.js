@@ -100,8 +100,9 @@ const createProperty = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Request body is required' });
     }
 
+    const ownerId = req.user?.role === 'admin' && req.body.ownerId ? req.body.ownerId : req.user._id;
     const property = await propertyService.createProperty({
-      ownerId: req.user._id,
+      ownerId,
       payload: req.body,
       files: req.files || []
     });
@@ -110,6 +111,28 @@ const createProperty = async (req, res) => {
   } catch (err) {
     console.error('Error creating property', err);
     res.status(500).json({ success: false, message: err.message || 'Failed to create property' });
+  }
+};
+
+const updateProperty = async (req, res) => {
+  try {
+    if (!req.body || Object.keys(req.body).length === 0) {
+      return res.status(400).json({ success: false, message: 'Request body is required' });
+    }
+
+    const property = await propertyService.updateProperty({
+      propertyId: req.params.id,
+      payload: req.body,
+      files: req.files || []
+    });
+
+    res.json({ success: true, message: 'Property updated successfully', data: property });
+  } catch (err) {
+    console.error('Error updating property', err);
+    if (err.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, message: err.message });
+    }
+    res.status(500).json({ success: false, message: err.message || 'Failed to update property' });
   }
 };
 
@@ -140,6 +163,7 @@ module.exports = {
   recordPropertyView,
   addFavorite,
   createProperty,
+  updateProperty,
   deleteProperty,
   handleUpload
 };

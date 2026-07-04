@@ -39,11 +39,6 @@ FIREBASE_MEASUREMENT_ID=your_measurement_id
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 
-# Google Services
-GOOGLE_MAPS_API_KEY=your_google_maps_api_key
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_REDIRECT_URI=your_google_redirect_uri
-
 # API Configuration
 PORT=3001
 NODE_ENV=development

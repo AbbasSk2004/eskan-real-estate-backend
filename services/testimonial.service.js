@@ -65,8 +65,29 @@ const createTestimonial = async (userId, content, rating) => {
   return normalizeTestimonial(testimonial);
 };
 
+const listAllTestimonials = async () => {
+  const testimonials = await Testimonial.find().sort({ createdAt: -1 }).populate('userId', 'firstName lastName profilePhoto email');
+  return testimonials.map(normalizeTestimonial);
+};
+
+const updateTestimonialApproval = async (id, approved) => {
+  const testimonial = await Testimonial.findById(id).populate('userId', 'firstName lastName profilePhoto email');
+  if (!testimonial) return null;
+  testimonial.approved = approved;
+  await testimonial.save();
+  return normalizeTestimonial(testimonial);
+};
+
+const deleteTestimonial = async (id) => {
+  const deleted = await Testimonial.findByIdAndDelete(id);
+  return !!deleted;
+};
+
 module.exports = {
   getApprovedTestimonials,
   checkUserTestimonial,
-  createTestimonial
+  createTestimonial,
+  listAllTestimonials,
+  updateTestimonialApproval,
+  deleteTestimonial
 };

@@ -62,8 +62,11 @@ const optionalAuth = async (req, res, next) => {
   next();
 };
 
+const requireAdmin = requireRole('admin');
+
 module.exports = {
   requireAuth,
   requireRole,
+  requireAdmin,
   optionalAuth
 };

@@ -24,6 +24,23 @@ const typepageRoutes = require('./routes/typepage');
 const contactRoutes = require('./routes/contact');
 const notificationRoutes = require('./routes/notifications');
 const favoriteRoutes = require('./routes/favorites');
+
+// Admin routes
+const adminAuthRoutes = require('./routes/admin/auth');
+const adminUsersRoutes = require('./routes/admin/users');
+const adminAgentsRoutes = require('./routes/admin/agents');
+const adminPropertiesRoutes = require('./routes/admin/properties');
+const adminTestimonialsRoutes = require('./routes/admin/testimonials');
+const adminContactSubmissionsRoutes = require('./routes/admin/contact-submissions');
+const adminPropertyInquiriesRoutes = require('./routes/admin/property-inquiries');
+const adminFaqRoutes = require('./routes/admin/faqs');
+const adminBlogsRoutes = require('./routes/admin/blogs');
+const adminAnalyticsRoutes = require('./routes/admin/analytics');
+const adminDashboardRoutes = require('./routes/admin/dashboard');
+const adminProfileRoutes = require('./routes/admin/profile');
+const adminPropertyViewsRoutes = require('./routes/admin/property-views');
+const adminNotificationsRoutes = require('./routes/admin/notifications');
+
 const { setupWebSocket } = require('./websocket');
 
 const app = express();
@@ -53,7 +70,12 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL 
 
 // In local development, explicitly allow the local frontend origin(s).
 if (process.env.NODE_ENV === 'development') {
-  const localDevOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  const localDevOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5000',
+    'http://127.0.0.1:5000'
+  ];
   localDevOrigins.forEach((origin) => {
     if (!allowedOrigins.includes(origin)) {
       allowedOrigins.push(origin);
@@ -105,6 +127,22 @@ app.use('/api/typepage', typepageRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/favorites', favoriteRoutes);
+
+// Admin routes (protected by auth + admin role)
+app.use('/api/admin/auth', adminAuthRoutes);
+app.use('/api/admin/users', adminUsersRoutes);
+app.use('/api/admin/agents', adminAgentsRoutes);
+app.use('/api/admin/properties', adminPropertiesRoutes);
+app.use('/api/admin/testimonials', adminTestimonialsRoutes);
+app.use('/api/admin/contact-submissions', adminContactSubmissionsRoutes);
+app.use('/api/admin/property-inquiries', adminPropertyInquiriesRoutes);
+app.use('/api/admin/faqs', adminFaqRoutes);
+app.use('/api/admin/blogs', adminBlogsRoutes);
+app.use('/api/admin/analytics', adminAnalyticsRoutes);
+app.use('/api/admin/dashboard', adminDashboardRoutes);
+app.use('/api/admin/profile', adminProfileRoutes);
+app.use('/api/admin/property-views', adminPropertyViewsRoutes);
+app.use('/api/admin/notifications', adminNotificationsRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

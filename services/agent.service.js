@@ -127,9 +127,52 @@ const submitAgentApplication = async ({ userId, payload, files }) => {
   return transformAgent(await newAgent.populate('userId', 'firstName lastName email profilePhoto phone'));
 };
 
+const listAgentApplications = async () => {
+  const agents = await Agent.find({ approved: false }).sort({ createdAt: -1 }).populate('userId', 'firstName lastName email profilePhoto phone');
+  return agents.map(transformAgent);
+};
+
+const updateAgentApplication = async ({ id, data }) => {
+  const agent = await Agent.findById(id).populate('userId', 'firstName lastName email profilePhoto phone');
+  if (!agent) return null;
+  if (data.status !== undefined) agent.status = data.status;
+  if (data.approved !== undefined) agent.approved = data.approved;
+  if (data.approvedAt !== undefined) agent.approvedAt = data.approvedAt;
+  await agent.save();
+  return transformAgent(agent);
+};
+
+const updateAgentFeature = async ({ id, isFeatured }) => {
+  const agent = await Agent.findById(id).populate('userId', 'firstName lastName email profilePhoto phone');
+  if (!agent) return null;
+  agent.isFeatured = Boolean(isFeatured);
+  await agent.save();
+  return transformAgent(agent);
+};
+
+const updateAgent = async ({ id, data }) => {
+  const agent = await Agent.findById(id).populate('userId', 'firstName lastName email profilePhoto phone');
+  if (!agent) return null;
+  Object.assign(agent, data);
+  await agent.save();
+  return transformAgent(agent);
+};
+
+const deleteAgent = async (id) => {
+  const agent = await Agent.findById(id);
+  if (!agent) return false;
+  await agent.deleteOne();
+  return true;
+};
+
 module.exports = {
   listAgents,
   getAgentById,
   getAgentApplicationByUserId,
-  submitAgentApplication
+  submitAgentApplication,
+  listAgentApplications,
+  updateAgentApplication,
+  updateAgentFeature,
+  updateAgent,
+  deleteAgent
 };

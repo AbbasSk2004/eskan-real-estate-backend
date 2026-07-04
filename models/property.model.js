@@ -28,7 +28,6 @@ const propertySchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  locationUrl: { type: String },
   livingRooms: { type: Number },
   floor: { type: Number },
   yearBuilt: { type: Number },

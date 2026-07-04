@@ -281,7 +281,6 @@ const createProperty = async ({ ownerId, payload, files = [] }) => {
         return {};
       }
     })(),
-    locationUrl: payload.locationUrl || payload.location_url,
     view: payload.view,
     description: payload.description,
     title: payload.title,
@@ -322,6 +321,75 @@ const createProperty = async ({ ownerId, payload, files = [] }) => {
 
   await property.save();
   return toResponse(property);
+};
+
+const updateProperty = async ({ propertyId, payload, files = [] }) => {
+  const property = await Property.findById(propertyId);
+  if (!property) {
+    const err = new Error('Property not found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+
+  // Merge payload fields (keep existing values when missing)
+  const updates = {
+    ...payload,
+    propertyType: payload.propertyType || payload.property_type || property.propertyType,
+    status: payload.status || property.status,
+    price: payload.price !== undefined ? Number(payload.price) : property.price,
+    area: payload.area !== undefined ? Number(payload.area) : property.area,
+    bedrooms: payload.bedrooms !== undefined ? Number(payload.bedrooms) : property.bedrooms,
+    bathrooms: payload.bathrooms !== undefined ? Number(payload.bathrooms) : property.bathrooms,
+    livingRooms: payload.livingRooms !== undefined ? Number(payload.livingRooms) : property.livingRooms,
+    floor: payload.floor !== undefined ? Number(payload.floor) : property.floor,
+    yearBuilt: payload.yearBuilt !== undefined ? Number(payload.yearBuilt) : property.yearBuilt,
+    parkingSpaces: payload.parkingSpaces !== undefined ? Number(payload.parkingSpaces) : property.parkingSpaces,
+    gardenArea: payload.gardenArea !== undefined ? Number(payload.gardenArea) : property.gardenArea,
+    meetingRooms: payload.meetingRooms !== undefined ? Number(payload.meetingRooms) : property.meetingRooms,
+    shopFrontWidth: payload.shopFrontWidth !== undefined ? Number(payload.shopFrontWidth) : property.shopFrontWidth,
+    storageArea: payload.storageArea !== undefined ? Number(payload.storageArea) : property.storageArea,
+    units: payload.units !== undefined ? Number(payload.units) : property.units,
+    elevators: payload.elevators !== undefined ? Number(payload.elevators) : property.elevators,
+    plotSize: payload.plotSize !== undefined ? Number(payload.plotSize) : property.plotSize,
+    ceilingHeight: payload.ceilingHeight !== undefined ? Number(payload.ceilingHeight) : property.ceilingHeight,
+    loadingDocks: payload.loadingDocks !== undefined ? Number(payload.loadingDocks) : property.loadingDocks,
+    farmArea: payload.farmArea !== undefined ? Number(payload.farmArea) : property.farmArea,
+    features: payload.features !== undefined ? payload.features : property.features,
+    title: payload.title !== undefined ? payload.title : property.title,
+    description: payload.description !== undefined ? payload.description : property.description,
+    address: payload.address !== undefined ? payload.address : property.address,
+    city: payload.city !== undefined ? payload.city : property.city,
+    village: payload.village !== undefined ? payload.village : property.village,
+    verified: payload.verified !== undefined ? payload.verified : property.verified,
+    recommended: payload.recommended !== undefined ? payload.recommended : property.recommended
+  };
+
+  Object.assign(property, updates);
+
+  // Handle new images uploads
+  if (files.length) {
+    const folder = `properties/${property._id}`;
+
+    const uploaded = await Promise.all(
+      files.map(async (file, index) => {
+        const filename = `${property._id}-${Date.now()}-${index}`;
+        const result = await uploadToCloudinary({ buffer: file.buffer, folder, filename });
+        return {
+          url: result.secure_url,
+          publicId: result.public_id
+        };
+      })
+    );
+
+    // Append new images
+    property.images = [...(property.images || []), ...uploaded];
+    if (!property.mainImage && uploaded[0]) {
+      property.mainImage = uploaded[0];
+    }
+  }
+
+  await property.save();
+  return toResponse(await populateOwner(Property.findById(property._id)));
 };
 
 const deleteProperty = async ({ propertyId, userId, userRole }) => {
@@ -388,6 +456,7 @@ module.exports = {
   getUserProperties,
   getPropertyById,
   createProperty,
+  updateProperty,
   deleteProperty,
   recordPropertyView,
   addFavorite,

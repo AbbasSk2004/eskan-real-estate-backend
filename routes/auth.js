@@ -26,12 +26,35 @@ const buildAuthResponse = (user, tokens) => {
 // Register new user
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, firstName, lastName, phone } = req.body || {};
-    if (!email || !password || !firstName || !lastName) {
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      firstname,
+      lastname,
+      phone
+    } = req.body || {};
+
+    const resolvedFirstName = firstName || firstname;
+    const resolvedLastName = lastName || lastname;
+
+    if (!email || !password || !resolvedFirstName || !resolvedLastName) {
       return res.status(400).json({ success: false, error: 'validation_error', message: 'Missing required fields' });
     }
 
-    const { user, tokens } = await authService.register({ email, password, firstName, lastName, phone });
+    const { user, tokens, verificationRequired } = await authService.register({
+      email,
+      password,
+      firstName: resolvedFirstName,
+      lastName: resolvedLastName,
+      phone
+    });
+
+    if (verificationRequired) {
+      return res.status(201).json({ success: true, user, verificationRequired: true, message: 'Email verification required' });
+    }
+
     return res.status(201).json(buildAuthResponse(user, tokens));
   } catch (err) {
     console.error('Register error', err);
@@ -139,6 +162,40 @@ router.post('/logout', async (req, res) => {
   } catch (err) {
     console.error('Logout error', err);
     return res.status(500).json({ success: false, error: 'server_error', message: err.message });
+  }
+});
+
+// Verify OTP - activate user account
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { email, token } = req.body || {};
+    if (!email || !token) {
+      return res.status(400).json({ success: false, error: 'validation_error', message: 'Email and token are required' });
+    }
+
+    const { user, tokens } = await authService.verifyEmailOtp({ email, token });
+    return res.json(buildAuthResponse(user, tokens));
+  } catch (err) {
+    console.error('Verify OTP error', err);
+    const status = err.code === 'INVALID_OTP' || err.code === 'OTP_EXPIRED' ? 400 : 500;
+    return res.status(status).json({ success: false, error: err.code || 'server_error', message: err.message });
+  }
+});
+
+// Resend OTP
+router.post('/resend-otp', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'validation_error', message: 'Email is required' });
+    }
+
+    await authService.resendEmailVerification({ email });
+    return res.json({ success: true, message: 'Verification code resent' });
+  } catch (err) {
+    console.error('Resend OTP error', err);
+    const status = err.code === 'USER_NOT_FOUND' || err.code === 'ALREADY_VERIFIED' ? 400 : 500;
+    return res.status(status).json({ success: false, error: err.code || 'server_error', message: err.message });
   }
 });
 
