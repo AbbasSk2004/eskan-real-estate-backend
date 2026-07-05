@@ -32,5 +32,6 @@ router.delete('/:id', deleteUser);
 
 router.post('/upload-profile-image', upload.single('profile_image'), uploadProfileImage);
 router.delete('/delete-profile-image', deleteProfileImage);
+router.delete('/delete-profile-image/:filename', deleteProfileImage);
 
 module.exports = router;

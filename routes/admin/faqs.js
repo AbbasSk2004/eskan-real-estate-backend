@@ -8,6 +8,7 @@ const requireAdmin = requireRole('admin');
 // Public endpoints
 router.get('/', faqController.getAllFaqs);
 router.get('/featured', faqController.getFeaturedFaqs);
+router.get('/categories', faqController.getCategories);
 router.get('/category/:category', faqController.getFaqsByCategory);
 
 // Admin-only endpoints

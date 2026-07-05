@@ -24,11 +24,12 @@ const buildPropertyQuery = ({
 }) => {
   const filter = {};
 
-  if (verified !== false) {
-    filter.verified = true;
-  }
-  if (typeof verified === 'boolean') {
+  if (verified === 'all') {
+    // Admin listings can request every property regardless of verification status.
+  } else if (typeof verified === 'boolean') {
     filter.verified = verified;
+  } else {
+    filter.verified = true;
   }
   if (typeof isFeatured === 'boolean') {
     filter.isFeatured = isFeatured;
@@ -186,7 +187,7 @@ const listProperties = async (queryParams = {}, options = {}) => {
     ...filters
   } = queryParams;
 
-  const verifiedFlag = verified === 'false' ? false : true;
+  const verifiedFlag = verified === 'all' ? 'all' : verified === 'false' ? false : true;
   const filter = buildPropertyQuery({ ...filters, verified: verifiedFlag });
   const sort = buildSort(sortBy);
 

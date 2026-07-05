@@ -4,6 +4,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { Pool } = require('pg');
 const { connectToMongo, disconnectMongo } = require('../config/mongo');
+const { normalizePasswordHash } = require('../services/auth.service');
 
 const User = require('../models/user.model');
 const Property = require('../models/property.model');
@@ -110,7 +111,7 @@ async function fetchAuthUsers(client) {
     }
 
     const res = await client.query(`
-      SELECT id, email, email_confirmed_at
+      SELECT id, email, email_confirmed_at, encrypted_password
       FROM auth.users
     `);
 
@@ -159,9 +160,14 @@ async function migrateUsers(rows, authUsersById = {}) {
       lastLoginAt: toDate(row.last_login, row.last_login_at)
     };
 
+    const update = { $set: doc, $setOnInsert: { createdAt: new Date() } };
+    if (authUser?.encrypted_password) {
+      update.$set.passwordHash = normalizePasswordHash(authUser.encrypted_password);
+    }
+
     await User.findOneAndUpdate(
       { _id: doc._id },
-      { $set: doc, $setOnInsert: { createdAt: new Date() } },
+      update,
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
   }

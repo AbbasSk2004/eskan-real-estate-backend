@@ -1,4 +1,6 @@
 const Blog = require('../models/blog.model');
+const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/cloudinaryUpload');
+const { buildFolderPath } = require('../config/cloudinary');
 
 const toResponse = (blogDoc) => {
   const blog = blogDoc.toObject ? blogDoc.toObject({ virtuals: true }) : blogDoc;
@@ -94,12 +96,51 @@ const deleteBlog = async (id) => {
   return blog ? toResponse(blog) : null;
 };
 
+const getAllBlogsAdmin = async () => {
+  const blogs = await Blog.find().sort({ createdAt: -1 });
+  return blogs.map(toResponse);
+};
+
+const uploadBlogImage = async (file) => {
+  if (!file) {
+    const err = new Error('No file uploaded');
+    err.code = 'NO_FILE';
+    throw err;
+  }
+
+  const folder = buildFolderPath('blogs');
+  const filename = `${Date.now()}`;
+  const result = await uploadToCloudinary({
+    buffer: file.buffer,
+    folder,
+    filename,
+    resourceType: 'image'
+  });
+
+  return result.secure_url || result.url;
+};
+
+const deleteBlogImage = async (filename) => {
+  if (!filename) {
+    const err = new Error('Filename is required');
+    err.code = 'MISSING_FILENAME';
+    throw err;
+  }
+
+  const publicId = buildFolderPath('blogs', filename).replace(/\.[^/.]+$/, '');
+  await deleteFromCloudinary(publicId).catch(() => {});
+  return true;
+};
+
 module.exports = {
   listBlogs,
   getRecentBlogs,
   getBlogBySlug,
   getBlogById,
+  getAllBlogsAdmin,
   createBlog,
   updateBlog,
-  deleteBlog
+  deleteBlog,
+  uploadBlogImage,
+  deleteBlogImage
 };

@@ -1,4 +1,5 @@
 const Notification = require('../models/notification.model');
+const notificationStream = require('../utils/notificationStream');
 
 const TYPE_PRIORITY_MAP = {
   message: 'high',
@@ -32,14 +33,24 @@ const toResponse = (notificationDoc) => {
   };
 };
 
-const listNotifications = async ({ userId, type, unreadOnly } = {}) => {
+const listNotifications = async ({ userId, type, unreadOnly, limit, offset } = {}) => {
   if (!userId) return [];
 
   const filter = { userId };
   if (type) filter.type = type;
   if (unreadOnly === true) filter.read = false;
 
-  const notifications = await Notification.find(filter).sort({ createdAt: -1 });
+  let query = Notification.find(filter).sort({ createdAt: -1 });
+
+  if (Number.isFinite(Number(offset)) && Number(offset) > 0) {
+    query = query.skip(Number(offset));
+  }
+
+  if (Number.isFinite(Number(limit)) && Number(limit) > 0) {
+    query = query.limit(Number(limit));
+  }
+
+  const notifications = await query;
   return notifications.map(toResponse);
 };
 
@@ -88,6 +99,12 @@ const deleteNotification = async (id, userId) => {
 const bulkDeleteNotifications = async (ids = [], userId) => {
   if (!Array.isArray(ids) || !ids.length || !userId) return { deletedCount: 0 };
   const result = await Notification.deleteMany({ _id: { $in: ids }, userId });
+  return { deletedCount: result.deletedCount || 0 };
+};
+
+const deleteAllForUser = async (userId) => {
+  if (!userId) return { deletedCount: 0 };
+  const result = await Notification.deleteMany({ userId });
   return { deletedCount: result.deletedCount || 0 };
 };
 
@@ -146,7 +163,9 @@ const createNotification = async ({ userId, type, title, message, data = {}, rea
 
   const notification = new Notification(payload);
   await notification.save();
-  return toResponse(notification);
+  const response = toResponse(notification);
+  notificationStream.broadcastToUser(userId, response);
+  return response;
 };
 
 module.exports = {
@@ -158,6 +177,7 @@ module.exports = {
   getUnreadCount,
   deleteNotification,
   bulkDeleteNotifications,
+  deleteAllForUser,
   getStats,
   createNotification
 };

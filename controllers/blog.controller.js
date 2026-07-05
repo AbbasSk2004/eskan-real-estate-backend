@@ -72,11 +72,61 @@ const deleteBlog = async (req, res) => {
   }
 };
 
+const getAllBlogsAdmin = async (req, res) => {
+  try {
+    const blogs = await blogService.getAllBlogsAdmin();
+    res.json({ success: true, data: blogs });
+  } catch (err) {
+    console.error('Error fetching admin blogs', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch blogs' });
+  }
+};
+
+const getBlogById = async (req, res) => {
+  try {
+    const blog = await blogService.getBlogById(req.params.id);
+    if (!blog) {
+      return res.status(404).json({ success: false, message: 'Blog not found' });
+    }
+    res.json({ success: true, data: blog });
+  } catch (err) {
+    console.error('Error fetching blog by id', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch blog' });
+  }
+};
+
+const uploadBlogImage = async (req, res) => {
+  try {
+    const imageUrl = await blogService.uploadBlogImage(req.file);
+    res.json({ success: true, imageUrl });
+  } catch (err) {
+    console.error('Error uploading blog image', err);
+    res.status(err.code === 'NO_FILE' ? 400 : 500).json({
+      success: false,
+      message: err.message || 'Failed to upload blog image'
+    });
+  }
+};
+
+const deleteBlogImage = async (req, res) => {
+  try {
+    await blogService.deleteBlogImage(req.params.filename);
+    res.json({ success: true, message: 'Blog image deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting blog image', err);
+    res.status(500).json({ success: false, message: 'Failed to delete blog image' });
+  }
+};
+
 module.exports = {
   getRecentBlogs,
   getBlogs,
   getBlogBySlug,
+  getBlogById,
+  getAllBlogsAdmin,
   createBlog,
   updateBlog,
-  deleteBlog
+  deleteBlog,
+  uploadBlogImage,
+  deleteBlogImage
 };

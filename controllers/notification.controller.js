@@ -1,11 +1,19 @@
 const notificationService = require('../services/notification.service');
+const authService = require('../services/auth.service');
+const User = require('../models/user.model');
+const notificationStream = require('../utils/notificationStream');
 
 const getNotifications = async (req, res) => {
   try {
     const userId = req.user?._id;
-    const { type } = req.query;
+    const { type, limit, offset } = req.query;
 
-    const notifications = await notificationService.listNotifications({ userId, type });
+    const notifications = await notificationService.listNotifications({
+      userId,
+      type,
+      limit: limit ? Number(limit) : undefined,
+      offset: offset ? Number(offset) : undefined
+    });
 
     return res.json({ success: true, data: notifications });
   } catch (err) {
@@ -121,6 +129,17 @@ const bulkDelete = async (req, res) => {
   }
 };
 
+const deleteAll = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const result = await notificationService.deleteAllForUser(userId);
+    return res.json({ success: true, data: { deletedCount: result.deletedCount } });
+  } catch (err) {
+    console.error('Error deleting all notifications', err);
+    return res.status(500).json({ success: false, message: 'Failed to delete all notifications' });
+  }
+};
+
 const testNotification = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -138,6 +157,66 @@ const testNotification = async (req, res) => {
   }
 };
 
+const streamNotifications = async (req, res) => {
+  const userId = req.user?._id;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  if (typeof res.flushHeaders === 'function') {
+    res.flushHeaders();
+  }
+
+  res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+
+  notificationStream.addClient(userId, res);
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': heartbeat\n\n');
+    } catch (err) {
+      clearInterval(heartbeat);
+      notificationStream.removeClient(userId, res);
+    }
+  }, 30000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    notificationStream.removeClient(userId, res);
+  });
+};
+
+const authenticateStream = async (req, res, next) => {
+  try {
+    const token = req.query.token;
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'Token required' });
+    }
+
+    const payload = authService.verifyAccessToken(token);
+    if (!payload?.sub) {
+      return res.status(401).json({ success: false, message: 'Invalid access token' });
+    }
+
+    const user = await User.findById(payload.sub);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Insufficient privileges' });
+    }
+
+    req.user = user;
+    req.tokenPayload = payload;
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   getNotifications,
   getNotificationsByType,
@@ -148,5 +227,8 @@ module.exports = {
   bulkMarkAsRead,
   deleteNotification,
   bulkDelete,
-  testNotification
+  deleteAll,
+  testNotification,
+  streamNotifications,
+  authenticateStream
 };

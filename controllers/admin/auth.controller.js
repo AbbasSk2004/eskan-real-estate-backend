@@ -28,7 +28,14 @@ const login = async (req, res) => {
   } catch (err) {
     console.error('Admin login error', err);
     const errorCode = err.code || 'server_error';
-    const status = err.status || (['INVALID_CREDENTIALS', 'EMAIL_NOT_VERIFIED', 'ACCESS_DENIED', 'USER_NOT_FOUND'].includes(errorCode) ? 401 : 500);
+    const statusByCode = {
+      INVALID_CREDENTIALS: 401,
+      EMAIL_NOT_VERIFIED: 403,
+      PASSWORD_NOT_SET: 400,
+      ACCESS_DENIED: 403,
+      USER_NOT_FOUND: 404
+    };
+    const status = err.status || statusByCode[errorCode] || 500;
     return res.status(status).json({ success: false, error: errorCode, message: err.message });
   }
 };

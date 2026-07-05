@@ -33,6 +33,11 @@ const getFaqsByCategory = async (category) => {
   return faqs.map(normalizeFaq);
 };
 
+const getCategories = async () => {
+  const categories = await Faq.distinct('category');
+  return categories.filter(Boolean).sort((a, b) => a.localeCompare(b));
+};
+
 const createFaq = async (payload) => {
   const highestOrder = await Faq.findOne().sort({ order: -1 }).select('order');
   const nextOrder = (highestOrder?.order ?? 0) + 1;
@@ -58,6 +63,7 @@ module.exports = {
   getAllFaqs,
   getFeaturedFaqs,
   getFaqsByCategory,
+  getCategories,
   createFaq,
   updateFaq,
   deleteFaq

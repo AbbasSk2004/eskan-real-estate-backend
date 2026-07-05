@@ -31,6 +31,16 @@ const getFaqsByCategory = async (req, res) => {
   }
 };
 
+const getCategories = async (req, res) => {
+  try {
+    const categories = await faqService.getCategories();
+    res.json({ success: true, data: categories });
+  } catch (err) {
+    console.error('Error fetching FAQ categories', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch FAQ categories' });
+  }
+};
+
 const createFaq = async (req, res) => {
   try {
     const faq = await faqService.createFaq(req.body);
@@ -71,6 +81,7 @@ module.exports = {
   getAllFaqs,
   getFeaturedFaqs,
   getFaqsByCategory,
+  getCategories,
   createFaq,
   updateFaq,
   deleteFaq

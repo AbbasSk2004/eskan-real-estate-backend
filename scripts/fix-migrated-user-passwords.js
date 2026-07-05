@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Sets a default password for migrated users missing passwordHash.
+// Prefer running import-supabase-passwords.js first to preserve original Supabase passwords.
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
@@ -9,6 +11,7 @@ const User = require('../models/user.model');
 const args = parseArgs(process.argv.slice(2));
 const dryRun = Boolean(args['dry-run'] || args.dryRun);
 const password = args.password || args.p || process.env.DEFAULT_MIGRATED_PASSWORD || '12345678';
+const targetEmail = (args.email || args.e || '').toLowerCase().trim();
 
 async function main() {
   console.log('Starting migrated user password repair');
@@ -18,13 +21,24 @@ async function main() {
   await connectToMongo();
 
   try {
-    const usersToFix = await User.find({
-      $or: [
-        { passwordHash: { $exists: false } },
-        { passwordHash: null },
-        { passwordHash: '' }
-      ]
-    }).select('_id email role emailVerified').lean();
+    const missingPasswordFilter = targetEmail
+      ? {
+          email: targetEmail,
+          $or: [
+            { passwordHash: { $exists: false } },
+            { passwordHash: null },
+            { passwordHash: '' }
+          ]
+        }
+      : {
+          $or: [
+            { passwordHash: { $exists: false } },
+            { passwordHash: null },
+            { passwordHash: '' }
+          ]
+        };
+
+    const usersToFix = await User.find(missingPasswordFilter).select('_id email role emailVerified').lean();
 
     const unverifiedWithPassword = await User.find({
       emailVerified: { $ne: true },
@@ -51,13 +65,7 @@ async function main() {
     if (usersToFix.length) {
       const passwordHash = await bcrypt.hash(password, saltRounds);
       const result = await User.updateMany(
-        {
-          $or: [
-            { passwordHash: { $exists: false } },
-            { passwordHash: null },
-            { passwordHash: '' }
-          ]
-        },
+        missingPasswordFilter,
         {
           $set: {
             passwordHash,

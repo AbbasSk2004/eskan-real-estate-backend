@@ -22,8 +22,18 @@ const hashPassword = async (password) => {
   return bcrypt.hash(password, saltRounds);
 };
 
+const normalizePasswordHash = (hash) => {
+  if (typeof hash !== 'string' || !hash) return hash;
+  // Supabase/GoTrue stores bcrypt as $2y$; Node bcrypt expects $2a$/$2b$.
+  if (hash.startsWith('$2y$')) {
+    return `$2a$${hash.slice(4)}`;
+  }
+  return hash;
+};
+
 const comparePassword = async (password, hash) => {
-  return bcrypt.compare(password, hash);
+  if (!hash) return false;
+  return bcrypt.compare(password, normalizePasswordHash(hash));
 };
 
 const normalizeProfilePhoto = (photo) => {
@@ -291,7 +301,7 @@ const register = async ({ email, password, firstName, lastName, phone }) => {
   return { user: sanitizedUser, verificationRequired: true };
 };
 
-const login = async ({ email, password }) => {
+const authenticateUser = async ({ email, password }) => {
   const normalizedEmail = email.toLowerCase().trim();
   const user = await User.findOne({ email: normalizedEmail });
   if (!user) {
@@ -336,10 +346,18 @@ const login = async ({ email, password }) => {
   user.lastLoginAt = new Date();
   await user.save();
 
+  return user;
+};
+
+const createSession = async (user) => {
   const tokens = await generateTokens(user);
   const sanitizedUser = sanitizeUser(user);
-
   return { user: sanitizedUser, tokens };
+};
+
+const login = async ({ email, password }) => {
+  const user = await authenticateUser({ email, password });
+  return createSession(user);
 };
 
 const refresh = async ({ userId, refreshToken }) => {
@@ -396,10 +414,13 @@ const revokeRefreshToken = async (userId, refreshToken) => {
 module.exports = {
   register,
   login,
+  authenticateUser,
+  createSession,
   refresh,
   verifyAccessToken,
   revokeRefreshToken,
   comparePassword,
+  normalizePasswordHash,
   hashPassword,
   sanitizeUser,
   verifyEmailOtp,

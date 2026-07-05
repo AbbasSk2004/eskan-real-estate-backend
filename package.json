@@ -12,7 +12,9 @@
     "setup-ml": "node scripts/setup_ml.js",
     "reset-dev-users": "node scripts/reset-dev-users.js",
     "migrate:supabase-to-mongo": "node scripts/migrate-supabase-to-mongo.js",
-    "fix:migrated-user-passwords": "node scripts/fix-migrated-user-passwords.js"
+    "import:supabase-passwords": "node scripts/import-supabase-passwords.js",
+    "fix:migrated-user-passwords": "node scripts/fix-migrated-user-passwords.js",
+    "ensure:admin-user": "node scripts/ensure-admin-user.js"
   },
   "keywords": [
     "real-estate",

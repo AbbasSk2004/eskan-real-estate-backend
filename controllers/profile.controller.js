@@ -84,8 +84,40 @@ const changePassword = async (req, res) => {
   }
 };
 
+const uploadProfilePhoto = async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'unauthorized', message: 'Authentication required' });
+    }
+
+    const profilePhotoFile =
+      req.file ||
+      (req.files?.profile_photo && req.files.profile_photo[0]) ||
+      (req.files?.profilePhoto && req.files.profilePhoto[0]) ||
+      null;
+
+    if (!profilePhotoFile) {
+      return res.status(400).json({ success: false, message: 'No profile photo uploaded' });
+    }
+
+    const updated = await profileService.updateProfile(userId, { profilePhoto: profilePhotoFile });
+
+    return res.json({
+      success: true,
+      photoUrl: updated.profile_photo || updated.profilePhoto?.url || null,
+      data: updated
+    });
+  } catch (err) {
+    console.error('Upload profile photo error:', err);
+    const status = err.code === 'PROFILE_NOT_FOUND' ? 404 : 500;
+    return res.status(status).json({ success: false, error: err.code || 'server_error', message: err.message });
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  uploadProfilePhoto
 };
