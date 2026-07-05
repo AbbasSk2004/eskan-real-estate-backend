@@ -1,83 +1,87 @@
 # Eskan Real Estate Backend API
 
-This is the backend API for the Eskan Real Estate application. It provides endpoints for property management, user authentication, and real estate agent services.
+A production-ready Node.js and Express backend for the Eskan real estate platform. The service powers property discovery, user authentication, agent management, chat, notifications, and content workflows using MongoDB as the primary data store and JWT for secure API access.
 
-## Features
+## Overview
 
-- User authentication with Supabase
-- Property listing and management
-- Real estate agent profiles
-- File uploads with Supabase Storage
-- Chat functionality
-- Property inquiries and favorites
-- Testimonials and contact forms
+This backend provides the core business logic and API layer for the platform, including:
+
+- User registration, login, and JWT-based session handling
+- Property creation, updates, search, and listing management
+- Agent profiles and agent-facing workflows
+- Favorites, inquiries, testimonials, and contact submissions
+- Messaging and notification services
+- Admin-specific management endpoints
 
 ## Tech Stack
 
 - Node.js
 - Express.js
-- Supabase (Database & Authentication)
-- Docker support
-- JWT Authentication
-- File Upload handling
+- MongoDB with Mongoose
+- JWT authentication
+- Cloudinary for image and media uploads
+- WebSocket support for real-time chat and notifications
+- Docker support for containerized deployment
+
+## Architecture Notes
+
+- Authentication is handled through JWT bearer tokens issued by the backend.
+- Persistent application data is stored in MongoDB rather than a Supabase-backed database.
+- Media uploads are processed through Cloudinary and referenced by the application.
+- The backend is designed to serve both the web and mobile clients through a single API layer.
 
 ## Environment Variables
 
-Create a `.env` file in the root directory with the following variables:
+Create a `.env` file in the project root with the following variables:
 
 ```env
-# Firebase Configuration
-FIREBASE_API_KEY=your_firebase_api_key
-FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
-FIREBASE_PROJECT_ID=your_firebase_project_id
-FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
-FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-FIREBASE_APP_ID=your_firebase_app_id
-FIREBASE_MEASUREMENT_ID=your_measurement_id
-
-# Supabase Configuration
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-
-# API Configuration
-PORT=3001
 NODE_ENV=development
+PORT=3001
+
+MONGO_URI=mongodb://localhost:27017/eskan
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRES_IN=7d
+
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+FRONTEND_URL=http://localhost:3000
 ```
 
 ## Installation
 
-1. Clone the repository
-2. Install dependencies:
+1. Install dependencies:
    ```bash
    npm install
    ```
-3. Create `.env` file with your configuration
-4. Start the development server:
+2. Create your `.env` file with the required variables.
+3. Start the development server:
    ```bash
    npm run dev
    ```
 
-## API Documentation
+## API Highlights
 
-### Authentication Endpoints
-- POST `/api/auth/register` - Register a new user
-- POST `/api/auth/login` - Login user
-- GET `/api/auth/verify` - Verify authentication token
+### Authentication
+- `POST /api/auth/register` - Register a new user
+- `POST /api/auth/login` - Authenticate a user and return a JWT
+- `GET /api/auth/verify` - Verify the current access token
 
-### Property Endpoints
-- GET `/api/properties` - Get all properties
-- POST `/api/properties` - Create a new property
-- GET `/api/properties/:id` - Get property by ID
+### Properties
+- `GET /api/properties` - Retrieve property listings
+- `POST /api/properties` - Create or update a property
+- `GET /api/properties/:id` - Fetch a single property
 
-### Agent Endpoints
-- GET `/api/agents` - Get all agents
-- GET `/api/agents/featured` - Get featured agents
-- GET `/api/agents/:id` - Get agent by ID
+### Agents and Content
+- `GET /api/agents` - Retrieve agent listings
+- `GET /api/agents/featured` - Get featured agents
+- `GET /api/blogs` - Fetch published blog posts
 
 ## Deployment
 
-This application is configured for deployment on Render.com. The `render.yaml` file contains the necessary configuration.
+The project is prepared for deployment on Render and includes a deployment configuration in `render.yaml`.
 
 ## License
 
-MIT 
+MIT
