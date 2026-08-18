@@ -134,8 +134,13 @@ router.post('/refresh', async (req, res) => {
     setAuthCookies(res, tokens);
     return res.json({ success: true, user });
   } catch (err) {
-    console.error('Refresh token error', err);
-    const status = err.code === 'INVALID_REFRESH_TOKEN' ? 401 : 500;
+    // A stale/unknown token is the client's problem, not a server fault: only
+    // genuinely unexpected failures should surface as 500 (and be logged).
+    const AUTH_FAILURES = ['INVALID_REFRESH_TOKEN', 'USER_NOT_FOUND', 'MISSING_REFRESH_TOKEN', 'MISSING_USER_ID'];
+    const status = AUTH_FAILURES.includes(err.code) ? 401 : 500;
+    if (status === 500) {
+      console.error('Refresh token error', err);
+    }
     return res.status(status).json({ success: false, error: err.code || 'server_error', message: err.message });
   }
 });
