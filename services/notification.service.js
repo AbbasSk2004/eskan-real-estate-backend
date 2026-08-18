@@ -1,0 +1,221 @@
+const Notification = require('../models/notification.model');
+const User = require('../models/user.model');
+const notificationStream = require('../utils/notificationStream');
+const { sendToUser } = require('../websocket');
+
+const TYPE_PRIORITY_MAP = {
+  message: 'high',
+  favorite_added: 'high',
+  property_inquiry: 'high',
+  testimonial_approved: 'medium',
+  property_approved: 'medium',
+  property_rejected: 'medium',
+  system: 'low'
+};
+
+const getPriority = (type) => {
+  if (!type) return 'low';
+  return TYPE_PRIORITY_MAP[type] || 'low';
+};
+
+const toResponse = (notificationDoc) => {
+  const notification = notificationDoc.toObject ? notificationDoc.toObject({ virtuals: true }) : notificationDoc;
+
+  const createdAt = notification.createdAt || notification.created_at;
+  const updatedAt = notification.updatedAt || notification.updated_at;
+
+  return {
+    ...notification,
+    id: notification._id || notification.id,
+    created_at: createdAt,
+    updated_at: updatedAt,
+    priority: notification.priority || getPriority(notification.type)
+  };
+};
+
+const listNotifications = async ({ userId, type, unreadOnly, limit, offset } = {}) => {
+  if (!userId) return [];
+
+  const filter = { userId };
+  if (type) filter.type = type;
+  if (unreadOnly === true) filter.read = false;
+
+  let query = Notification.find(filter).sort({ createdAt: -1 });
+
+  if (Number.isFinite(Number(offset)) && Number(offset) > 0) {
+    query = query.skip(Number(offset));
+  }
+
+  if (Number.isFinite(Number(limit)) && Number(limit) > 0) {
+    query = query.limit(Number(limit));
+  }
+
+  const notifications = await query;
+  return notifications.map(toResponse);
+};
+
+const getNotification = async (id, userId) => {
+  if (!id || !userId) return null;
+  const notification = await Notification.findOne({ _id: id, userId });
+  return notification ? toResponse(notification) : null;
+};
+
+const markAsRead = async (id, userId) => {
+  if (!id || !userId) return null;
+  const notification = await Notification.findOneAndUpdate(
+    { _id: id, userId },
+    { read: true },
+    { new: true }
+  );
+  if (!notification) return null;
+
+  const response = toResponse(notification);
+  sendToUser(userId, 'notification_updated', { notification: response });
+  return response;
+};
+
+const markAllAsRead = async (userId) => {
+  if (!userId) return { modifiedCount: 0 };
+  const unread = await Notification.find({ userId, read: false });
+  if (!unread.length) return { modifiedCount: 0 };
+  const result = await Notification.updateMany({ userId, read: false }, { read: true });
+  unread.forEach((notification) => {
+    sendToUser(userId, 'notification_updated', { notification: toResponse(notification) });
+  });
+  return { modifiedCount: result.modifiedCount || 0 };
+};
+
+const bulkMarkAsRead = async (ids = [], userId) => {
+  if (!Array.isArray(ids) || !ids.length || !userId) return { modifiedCount: 0 };
+  const unread = await Notification.find({ _id: { $in: ids }, userId, read: false });
+  const result = await Notification.updateMany(
+    { _id: { $in: ids }, userId },
+    { read: true }
+  );
+  unread.forEach((notification) => {
+    sendToUser(userId, 'notification_updated', { notification: toResponse(notification) });
+  });
+  return { modifiedCount: result.modifiedCount || 0 };
+};
+
+const getUnreadCount = async (userId) => {
+  if (!userId) return 0;
+  return Notification.countDocuments({ userId, read: false });
+};
+
+const deleteNotification = async (id, userId) => {
+  if (!id || !userId) return null;
+  const deleted = await Notification.findOneAndDelete({ _id: id, userId });
+  if (!deleted) return null;
+
+  const response = toResponse(deleted);
+  sendToUser(userId, 'notification_deleted', { id: response.id });
+  return response;
+};
+
+const bulkDeleteNotifications = async (ids = [], userId) => {
+  if (!Array.isArray(ids) || !ids.length || !userId) return { deletedCount: 0 };
+  const result = await Notification.deleteMany({ _id: { $in: ids }, userId });
+  return { deletedCount: result.deletedCount || 0 };
+};
+
+const deleteAllForUser = async (userId) => {
+  if (!userId) return { deletedCount: 0 };
+  const result = await Notification.deleteMany({ userId });
+  return { deletedCount: result.deletedCount || 0 };
+};
+
+const getStats = async (userId) => {
+  if (!userId) {
+    return {
+      total: 0,
+      unread: 0,
+      recent: 0,
+      byType: {},
+      byPriority: {
+        high: 0,
+        medium: 0,
+        low: 0
+      }
+    };
+  }
+
+  const notifications = await Notification.find({ userId }).sort({ createdAt: -1 });
+
+  const now = new Date();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  const stats = {
+    total: notifications.length,
+    unread: notifications.filter(n => !n.read).length,
+    recent: notifications.filter(n => (n.createdAt || n.created_at) > twentyFourHoursAgo).length,
+    byType: {},
+    byPriority: {
+      high: 0,
+      medium: 0,
+      low: 0
+    }
+  };
+
+  notifications.forEach((n) => {
+    const type = n.type || 'unknown';
+    stats.byType[type] = (stats.byType[type] || 0) + 1;
+
+    const priority = n.priority || getPriority(type);
+    stats.byPriority[priority] = (stats.byPriority[priority] || 0) + 1;
+  });
+
+  return stats;
+};
+
+const createNotification = async ({ userId, type, title, message, data = {}, read = false }) => {
+  const payload = {
+    userId,
+    type,
+    title,
+    message,
+    data,
+    read
+  };
+
+  const notification = new Notification(payload);
+  await notification.save();
+  const response = toResponse(notification);
+  notificationStream.broadcastToUser(userId, response);
+  sendToUser(userId, 'notification_created', { notification: response });
+  return response;
+};
+
+// Creates a notification for every admin user and pushes it in real time
+// (WebSocket + SSE) to all active admin sessions. Never throws — failures
+// must not break the business flow that triggered the notification.
+const createAdminNotification = async ({ type, title, message, data = {}, read = false }) => {
+  try {
+    const admins = await User.find({ role: 'admin' }).select('_id').lean();
+    await Promise.all(admins.map((admin) => createNotification({
+      userId: admin._id,
+      type,
+      title,
+      message,
+      data,
+      read
+    })));
+  } catch (err) {
+    console.error('Error creating admin notification:', err);
+  }
+};
+
+module.exports = {
+  listNotifications,
+  getNotification,
+  markAsRead,
+  markAllAsRead,
+  bulkMarkAsRead,
+  getUnreadCount,
+  deleteNotification,
+  bulkDeleteNotifications,
+  deleteAllForUser,
+  getStats,
+  createNotification,
+  createAdminNotification
+};

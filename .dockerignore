@@ -1,0 +1,27 @@
+# Files excluded from the Docker build context.
+#
+# Two reasons this matters:
+#   1. `.env` must never be copied into an image layer — a local build would
+#      otherwise bake JWT/Mongo/DeepSeek secrets into the image. (Render clones
+#      from git, where .env is ignored, but local `docker build` uses the host
+#      directory as-is.)
+#   2. Host `node_modules` must not overwrite the container's — native modules
+#      such as bcrypt are compiled per-platform and a Windows/macOS build would
+#      fail at runtime inside Linux.
+
+node_modules
+npm-debug.log
+
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+.gitattributes
+
+uploads
+*.log
+
+README.md
+database/schema.sql
