@@ -1,4 +1,5 @@
 const Faq = require('../models/faq.model');
+const { triggerRevalidation } = require('../utils/revalidateFrontend');
 
 const normalizeFaq = (faqDoc) => {
   const faq = faqDoc.toObject ? faqDoc.toObject({ virtuals: true }) : faqDoc;
@@ -46,16 +47,21 @@ const createFaq = async (payload) => {
     order: payload.order ?? nextOrder
   });
   await faq.save();
+  // FAQ reads are tagged `faqs` (see lib/api.js).
+  triggerRevalidation({ tags: ['faqs'] });
   return normalizeFaq(faq);
 };
 
 const updateFaq = async (id, payload) => {
   const faq = await Faq.findByIdAndUpdate(id, payload, { new: true });
-  return faq ? normalizeFaq(faq) : null;
+  if (!faq) return null;
+  triggerRevalidation({ tags: ['faqs'] });
+  return normalizeFaq(faq);
 };
 
 const deleteFaq = async (id) => {
   const faq = await Faq.findByIdAndDelete(id);
+  if (faq) triggerRevalidation({ tags: ['faqs'] });
   return !!faq;
 };
 

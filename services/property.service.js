@@ -4,6 +4,19 @@ const PropertyView = require('../models/propertyView.model');
 const notificationService = require('./notification.service');
 const aiService = require('./ai.service');
 const { uploadToCloudinary, deleteFromCloudinary, deleteFolderFromCloudinary, buildPropertyFolder } = require('../utils/cloudinaryUpload');
+const { triggerRevalidation } = require('../utils/revalidateFrontend');
+
+// Purge the web app's ISR cache for everything a property change can affect:
+// `properties` covers the homepage, grid, featured and type pages (all tagged
+// with it); the per-property tags cover the detail page, cached under whichever
+// segment the link used (slug or id — see `${slug || id}` hrefs on the frontend).
+const revalidateProperty = (property) => {
+  if (!property) return;
+  const tags = ['properties'];
+  if (property.slug) tags.push(`property-${property.slug}`);
+  if (property._id) tags.push(`property-${property._id}`);
+  triggerRevalidation({ tags });
+};
 
 // Fields owned by the AI enrichment pipeline. Stripped from every client
 // payload because createProperty/updateProperty spread the request body: without
@@ -392,6 +405,8 @@ const imageMatchesRefs = (image, refs) =>
   // awaited — a DeepSeek outage must not slow or fail a listing creation.
   aiService.enrichPropertyInBackground(property._id);
 
+  revalidateProperty(property);
+
   return toResponse(property);
 };
 
@@ -495,6 +510,8 @@ const updateProperty = async ({ propertyId, payload, files = [] }) => {
   // title+description hash, so price/photo edits cost nothing.
   aiService.enrichPropertyInBackground(property._id);
 
+  revalidateProperty(property);
+
   return toResponse(await populateOwner(Property.findById(property._id)));
 };
 
@@ -534,6 +551,8 @@ const deleteProperty = async ({ propertyId, userId, userRole }) => {
   await Property.deleteOne({ _id: propertyId });
   await Favorite.deleteMany({ propertyId });
   await PropertyView.deleteMany({ propertyId });
+
+  revalidateProperty(property);
 
   return true;
 };

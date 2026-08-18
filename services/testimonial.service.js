@@ -1,4 +1,5 @@
 const Testimonial = require('../models/testimonial.model');
+const { triggerRevalidation } = require('../utils/revalidateFrontend');
 
 const normalizeTestimonial = (testimonialDoc) => {
   const testimonial = testimonialDoc.toObject ? testimonialDoc.toObject({ virtuals: true }) : testimonialDoc;
@@ -62,6 +63,10 @@ const createTestimonial = async (userId, content, rating) => {
 
   // Populate user for normalised response
   await testimonial.populate('userId', 'firstName lastName profilePhoto email');
+
+  // Home carousel + testimonials list are tagged `testimonials` (see lib/api.js).
+  triggerRevalidation({ tags: ['testimonials'] });
+
   return normalizeTestimonial(testimonial);
 };
 
@@ -75,11 +80,13 @@ const updateTestimonialApproval = async (id, approved) => {
   if (!testimonial) return null;
   testimonial.approved = approved;
   await testimonial.save();
+  triggerRevalidation({ tags: ['testimonials'] });
   return normalizeTestimonial(testimonial);
 };
 
 const deleteTestimonial = async (id) => {
   const deleted = await Testimonial.findByIdAndDelete(id);
+  if (deleted) triggerRevalidation({ tags: ['testimonials'] });
   return !!deleted;
 };
 
