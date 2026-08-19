@@ -103,7 +103,10 @@ app.use(cors({
   credentials: true,
   // X-Visitor-Id lets cookie-less clients carry their own anonymous
   // personalization id (see middleware/auth.js attachVisitorId).
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Visitor-Id'],
+  // Cache-Control / Pragma are sent by profile.service.js (getProfile) to force a
+  // fresh read; neither is CORS-safelisted, so they must be allowed here or the
+  // preflight fails ("cache-control is not allowed by Access-Control-Allow-Headers").
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Visitor-Id', 'Cache-Control', 'Pragma'],
   // Cache preflight responses (X-Requested-With triggers OPTIONS checks)
   maxAge: 86400
 }));
