@@ -18,7 +18,7 @@ const authenticate = async (token) => {
     const payload = authService.verifyAccessToken(token);
     if (!payload?.sub) return null;
 
-    // Ensure user still exists and is active
+    // Ensure user still exists
     const user = await User.findById(payload.sub);
     if (!user) return null;
 
@@ -55,6 +55,27 @@ const authenticateAny = async (candidates) => {
   }
   return null;
 };
+
+// Presence is server-observed: the socket registry is the only thing that
+// actually knows who is connected, so it — not the client — is authoritative.
+// updateOne (not doc.save()) keeps this a single atomic field write that cannot
+// clobber a concurrent profile update; `status` is a hardcoded literal here, so
+// skipping enum validation is safe.
+const markPresence = async (userId, status) => {
+  try {
+    await User.updateOne(
+      { _id: userId },
+      { $set: { status, lastSeenAt: new Date() } }
+    );
+  } catch (err) {
+    console.error('Presence update failed', err);
+  }
+};
+
+// A connection that is open but quiet must not decay to "offline", so refresh
+// every connected user on a timer. One bulk write covers all of them, which is
+// far cheaper than writing on each inbound ping.
+const PRESENCE_REFRESH_MS = 60 * 1000;
 
 function setupWebSocket(server) {
   // Use noServer mode so we control the upgrade path explicitly.
@@ -99,13 +120,19 @@ function setupWebSocket(server) {
       userSockets.set(userId, new Set());
     }
     userSockets.get(userId).add(ws);
+    markPresence(userId, 'active');
     console.log(`WebSocket connected: ${userId}`);
 
     ws.on('close', () => {
       const set = userSockets.get(userId);
       if (set) {
         set.delete(ws);
-        if (set.size === 0) userSockets.delete(userId);
+        // Only the LAST socket closing means the user actually left — a second
+        // tab or a page navigation must not mark them offline.
+        if (set.size === 0) {
+          userSockets.delete(userId);
+          markPresence(userId, 'inactive');
+        }
       }
       console.log(`WebSocket disconnected: ${userId}`);
     });
@@ -135,6 +162,25 @@ function setupWebSocket(server) {
       }
     });
   };
+
+  // Keep every still-connected user fresh so `lastSeenAt` only goes stale when
+  // the connection is genuinely gone (crash, restart, dropped network).
+  const refreshTimer = setInterval(async () => {
+    const userIds = [...userSockets.keys()];
+    if (userIds.length === 0) return;
+    try {
+      await User.updateMany(
+        { _id: { $in: userIds } },
+        { $set: { status: 'active', lastSeenAt: new Date() } }
+      );
+    } catch (err) {
+      console.error('Presence refresh failed', err);
+    }
+  }, PRESENCE_REFRESH_MS);
+  // Never hold the process open just for the presence sweep.
+  if (typeof refreshTimer.unref === 'function') refreshTimer.unref();
+
+  server.on('close', () => clearInterval(refreshTimer));
 
   console.log('🔌 WebSocket server initialised (path: /ws)');
 }

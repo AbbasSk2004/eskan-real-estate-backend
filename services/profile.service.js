@@ -95,7 +95,11 @@ const updateProfile = async (userId, updateData = {}) => {
     }
   }
 
-  const allowedFields = ['firstName', 'lastName', 'phone', 'profilePhoto', 'status'];
+  // `status` is presence, owned by the presence paths (the WebSocket registry
+  // and POST /auth/update-status) — a profile edit must never write it. This
+  // findByIdAndUpdate runs without runValidators, so listing it here allowed
+  // arbitrary out-of-enum values to persist.
+  const allowedFields = ['firstName', 'lastName', 'phone', 'profilePhoto'];
   const payload = {};
 
   allowedFields.forEach((field) => {

@@ -84,7 +84,13 @@ const getUserProperties = async (req, res) => {
 
 const listProperties = async (req, res) => {
   try {
-    const data = await propertyService.listProperties(req.query);
+    // Admins get the owner's email/phone; everyone else must not (see
+    // populateOwner in property.service.js). The admin routes mount these same
+    // handlers behind requireRole('admin'), so the role on req.user is the
+    // authoritative signal — the mount path is not visible here.
+    const data = await propertyService.listProperties(req.query, {
+      includeOwnerContact: req.user?.role === 'admin'
+    });
     res.json({ success: true, ...data });
   } catch (err) {
     console.error('Error fetching properties', err);
@@ -94,7 +100,9 @@ const listProperties = async (req, res) => {
 
 const getProperty = async (req, res) => {
   try {
-    const property = await propertyService.getPropertyById(req.params.id);
+    const property = await propertyService.getPropertyById(req.params.id, {
+      includeOwnerContact: req.user?.role === 'admin'
+    });
     if (!property) {
       return res.status(404).json({ success: false, message: 'Property not found' });
     }

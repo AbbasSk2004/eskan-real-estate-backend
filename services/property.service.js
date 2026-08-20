@@ -135,7 +135,17 @@ const buildSort = (sortBy) => {
   }
 };
 
-const populateOwner = (query) => query.populate('ownerId', 'firstName lastName profilePhoto role');
+// Owner contact details are deliberately NOT in the public projection: the
+// public site never renders the owner's email or phone (it routes contact
+// through chat / inquiry forms), so including them would publish scrapeable PII
+// for no UI benefit. Admin-authenticated reads opt in explicitly.
+// `toResponse` already maps owner.email / owner.phone — they were simply never
+// selected here, which is why the admin panel showed "Email not available".
+const OWNER_PUBLIC_FIELDS = 'firstName lastName profilePhoto role';
+const OWNER_ADMIN_FIELDS = `${OWNER_PUBLIC_FIELDS} email phone`;
+
+const populateOwner = (query, { includeOwnerContact = false } = {}) =>
+  query.populate('ownerId', includeOwnerContact ? OWNER_ADMIN_FIELDS : OWNER_PUBLIC_FIELDS);
 
 const toResponse = (propertyDoc) => {
   const property = propertyDoc.toObject ? propertyDoc.toObject({ virtuals: true }) : propertyDoc;
@@ -177,6 +187,15 @@ const toResponse = (propertyDoc) => {
     farm_area: property.farmArea || property.farm_area || null,
     water_source: property.waterSource || property.water_source || null,
     crop_types: property.cropTypes || property.crop_types || null,
+    // These six were stored (or, after the normalizer fix, are now stored) but
+    // were never serialized back — so edit forms could not prefill them and
+    // detail pages could not show them. Additive: no existing consumer changes.
+    floors: property.floors || null,
+    land_type: property.landType || property.land_type || null,
+    zoning: property.zoning || null,
+    office_layout: property.officeLayout || property.office_layout || null,
+    meeting_rooms: property.meetingRooms || property.meeting_rooms || null,
+    view: property.view || null,
     // Keep as-is for compatibility with older clients
     is_featured: property.isFeatured || property.is_featured || false,
     verified: property.verified,
@@ -230,7 +249,8 @@ const listProperties = async (queryParams = {}, options = {}) => {
       Property.find(filter)
         .sort(sort)
         .skip((Number(page) - 1) * Number(pageSize))
-        .limit(Number(pageSize))
+        .limit(Number(pageSize)),
+      options
     )
   ]);
 
@@ -275,7 +295,7 @@ const getUserProperties = async (userId) => {
   return properties.map(toResponse);
 };
 
-const getPropertyById = async (idOrSlug) => {
+const getPropertyById = async (idOrSlug, options = {}) => {
   // Legacy fallback: UUIDs (current _id format) and Mongo ObjectIds are
   // resolved by _id; anything else is treated as a slug.
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
@@ -283,7 +303,7 @@ const getPropertyById = async (idOrSlug) => {
   const query = isUuid || isObjectId
     ? Property.findById(idOrSlug)
     : Property.findOne({ slug: String(idOrSlug || '').toLowerCase() });
-  const property = await populateOwner(query);
+  const property = await populateOwner(query, options);
   return property ? toResponse(property) : null;
 };
 
@@ -331,6 +351,7 @@ const imageMatchesRefs = (image, refs) =>
     bathrooms: payload.bathrooms !== undefined ? Number(payload.bathrooms) : undefined,
     livingRooms: toFiniteNumber(payload.livingRooms, payload.livingrooms, payload.living_rooms),
     floor: payload.floor !== undefined ? Number(payload.floor) : undefined,
+    floors: toFiniteNumber(payload.floors, payload.number_of_floors),
     yearBuilt: toFiniteNumber(payload.yearBuilt, payload.year_built),
     parkingSpaces: toFiniteNumber(payload.parkingSpaces, payload.parking_spaces),
     gardenArea: toFiniteNumber(payload.gardenArea, payload.garden_area),
@@ -342,6 +363,15 @@ const imageMatchesRefs = (image, refs) =>
     plotSize: toFiniteNumber(payload.plotSize, payload.plot_size),
     ceilingHeight: toFiniteNumber(payload.ceilingHeight, payload.ceiling_height),
     loadingDocks: toFiniteNumber(payload.loadingDocks, payload.loading_docks),
+    // String fields the model stores in camelCase. Both clients send snake_case,
+    // and without these five lines the `...payload` spread left the snake keys
+    // in place, which strict-mode Mongoose then dropped — so furnishing status,
+    // land type, office layout, water source and crop types never persisted.
+    furnishingStatus: payload.furnishingStatus || payload.furnishing_status,
+    landType: payload.landType || payload.land_type,
+    officeLayout: payload.officeLayout || payload.office_layout,
+    waterSource: payload.waterSource || payload.water_source,
+    cropTypes: payload.cropTypes || payload.crop_types,
     farmArea: payload.farmArea !== undefined ? Number(payload.farmArea) : undefined,
     price: payload.price !== undefined ? Number(payload.price) : undefined,
     features: (() => {
@@ -426,29 +456,52 @@ const updateProperty = async ({ propertyId, payload, files = [] }) => {
   delete payload.removedImages;
   delete payload.retainedImages;
 
+  // Both clients post snake_case. This merge previously read only camelCase, so
+  // every numeric field fell through to `property.<field>` and an edit silently
+  // kept the old value. These two helpers accept either convention and only
+  // fall back to the stored value when the payload really omitted the field.
+  const numOr = (current, ...candidates) => {
+    const next = toFiniteNumber(...candidates);
+    return next !== undefined ? next : current;
+  };
+  const strOr = (current, ...candidates) => {
+    const next = candidates.find((c) => c !== undefined && c !== null && c !== '');
+    return next !== undefined ? next : current;
+  };
+
   // Merge payload fields (keep existing values when missing)
   const updates = {
     ...payload,
-    propertyType: payload.propertyType || payload.property_type || property.propertyType,
+    propertyType: strOr(property.propertyType, payload.propertyType, payload.property_type),
     status: payload.status || property.status,
+    governorate: strOr(property.governorate, payload.governorate, payload.governate),
     price: payload.price !== undefined ? Number(payload.price) : property.price,
     area: payload.area !== undefined ? Number(payload.area) : property.area,
     bedrooms: payload.bedrooms !== undefined ? Number(payload.bedrooms) : property.bedrooms,
     bathrooms: payload.bathrooms !== undefined ? Number(payload.bathrooms) : property.bathrooms,
-    livingRooms: payload.livingRooms !== undefined ? Number(payload.livingRooms) : property.livingRooms,
-    floor: payload.floor !== undefined ? Number(payload.floor) : property.floor,
-    yearBuilt: payload.yearBuilt !== undefined ? Number(payload.yearBuilt) : property.yearBuilt,
-    parkingSpaces: payload.parkingSpaces !== undefined ? Number(payload.parkingSpaces) : property.parkingSpaces,
-    gardenArea: payload.gardenArea !== undefined ? Number(payload.gardenArea) : property.gardenArea,
-    meetingRooms: payload.meetingRooms !== undefined ? Number(payload.meetingRooms) : property.meetingRooms,
-    shopFrontWidth: payload.shopFrontWidth !== undefined ? Number(payload.shopFrontWidth) : property.shopFrontWidth,
-    storageArea: payload.storageArea !== undefined ? Number(payload.storageArea) : property.storageArea,
-    units: payload.units !== undefined ? Number(payload.units) : property.units,
-    elevators: payload.elevators !== undefined ? Number(payload.elevators) : property.elevators,
-    plotSize: payload.plotSize !== undefined ? Number(payload.plotSize) : property.plotSize,
-    ceilingHeight: payload.ceilingHeight !== undefined ? Number(payload.ceilingHeight) : property.ceilingHeight,
-    loadingDocks: payload.loadingDocks !== undefined ? Number(payload.loadingDocks) : property.loadingDocks,
-    farmArea: payload.farmArea !== undefined ? Number(payload.farmArea) : property.farmArea,
+    livingRooms: numOr(property.livingRooms, payload.livingRooms, payload.livingrooms, payload.living_rooms),
+    floor: numOr(property.floor, payload.floor),
+    floors: numOr(property.floors, payload.floors, payload.number_of_floors),
+    yearBuilt: numOr(property.yearBuilt, payload.yearBuilt, payload.year_built),
+    parkingSpaces: numOr(property.parkingSpaces, payload.parkingSpaces, payload.parking_spaces),
+    gardenArea: numOr(property.gardenArea, payload.gardenArea, payload.garden_area),
+    meetingRooms: numOr(property.meetingRooms, payload.meetingRooms, payload.meeting_rooms),
+    shopFrontWidth: numOr(property.shopFrontWidth, payload.shopFrontWidth, payload.shop_front_width),
+    storageArea: numOr(property.storageArea, payload.storageArea, payload.storage_area),
+    units: numOr(property.units, payload.units),
+    elevators: numOr(property.elevators, payload.elevators),
+    plotSize: numOr(property.plotSize, payload.plotSize, payload.plot_size),
+    ceilingHeight: numOr(property.ceilingHeight, payload.ceilingHeight, payload.ceiling_height),
+    loadingDocks: numOr(property.loadingDocks, payload.loadingDocks, payload.loading_docks),
+    farmArea: numOr(property.farmArea, payload.farmArea, payload.farm_area),
+    // Same five camelCase string fields the create path was dropping.
+    furnishingStatus: strOr(property.furnishingStatus, payload.furnishingStatus, payload.furnishing_status),
+    landType: strOr(property.landType, payload.landType, payload.land_type),
+    officeLayout: strOr(property.officeLayout, payload.officeLayout, payload.office_layout),
+    waterSource: strOr(property.waterSource, payload.waterSource, payload.water_source),
+    cropTypes: strOr(property.cropTypes, payload.cropTypes, payload.crop_types),
+    zoning: strOr(property.zoning, payload.zoning),
+    view: strOr(property.view, payload.view),
     features: payload.features !== undefined ? payload.features : property.features,
     title: payload.title !== undefined ? payload.title : property.title,
     description: payload.description !== undefined ? payload.description : property.description,

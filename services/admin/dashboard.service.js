@@ -17,9 +17,15 @@ const recentProperties = async () => {
 };
 
 const stats = async () => {
+  // "Active users" means online right now, so it must apply the same freshness
+  // window as User.isOnline. Counting status:'active' alone would include every
+  // user stranded by a crash or restart — and, before presence had a timestamp,
+  // essentially every user who had ever signed up.
+  const presenceCutoff = new Date(Date.now() - User.PRESENCE_STALE_MS);
+
   const [totalProperties, activeUsers, pendingInquiries, pendingContacts] = await Promise.all([
     Property.countDocuments({ verified: true }),
-    User.countDocuments({ status: 'active' }),
+    User.countDocuments({ status: 'active', lastSeenAt: { $gte: presenceCutoff } }),
     PropertyInquiry.countDocuments({ status: 'pending' }),
     Contact.countDocuments({ status: 'in_progress' })
   ]);

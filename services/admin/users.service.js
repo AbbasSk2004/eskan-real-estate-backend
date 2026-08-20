@@ -15,7 +15,12 @@ const toAdminUserJson = (user) => {
     email: doc.email || null,
     phone: doc.phone || null,
     role: doc.role || 'user',
-    status: doc.status || 'active',
+    // Presence: `status` is online/offline. `is_online` applies the freshness
+    // window (see user.model.js) so a session stranded by a crash or restart
+    // does not read as online forever. An unknown status means offline.
+    status: doc.status || 'inactive',
+    is_online: Boolean(doc.isOnline),
+    last_seen_at: doc.lastSeenAt || null,
     profile_photo: (doc.profilePhoto && doc.profilePhoto.url) || null,
     created_at: doc.createdAt || null
   };

@@ -31,7 +31,12 @@ const propertySchema = new mongoose.Schema({
     index: true
   },
   livingRooms: { type: Number },
+  // `floor` = which floor the unit is on (Apartment). `floors` = how many
+  // floors the building has (Villa / Building). Two different facts — they
+  // previously shared the single `floor` column, so entering one overwrote
+  // the other, and `floors` was dropped entirely by strict-mode schema.
   floor: { type: Number },
+  floors: { type: Number },
   yearBuilt: { type: Number },
   gardenArea: { type: Number },
   parkingSpaces: { type: Number },

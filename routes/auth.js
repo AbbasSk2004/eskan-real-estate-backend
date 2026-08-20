@@ -176,8 +176,22 @@ router.post('/update-status', async (req, res) => {
       return res.status(404).json({ success: false, error: 'user_not_found', message: 'User not found' });
     }
 
-    const status = req.body.status || 'active';
-    user.status = status;
+    // Presence fallback for clients with no open WebSocket, and for the
+    // beforeunload beacon (which cannot use one). The socket registry in
+    // websocket.js stays authoritative; this only reports the same two values.
+    // Validated strictly: this endpoint is CSRF-exempt, so it must never be
+    // able to write anything other than a presence value.
+    const requested = req.body?.status;
+    if (requested !== 'active' && requested !== 'inactive') {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid_status',
+        message: "status must be 'active' or 'inactive'"
+      });
+    }
+
+    user.status = requested;
+    user.lastSeenAt = new Date();
     await user.save();
 
     return res.json({ success: true, status: user.status });
